@@ -1,10 +1,12 @@
 from matchlens.retrievers.base import Candidates, Retriever, drop_self
 from matchlens.retrievers.bm25 import BM25Retriever
+from matchlens.retrievers.dense import PrecomputedEmbeddingRetriever
 from matchlens.retrievers.phash import PhashBoostRetriever
 
 REGISTRY = {
     "bm25": BM25Retriever,
     "phash_boost": PhashBoostRetriever,
+    "dense": PrecomputedEmbeddingRetriever,
 }
 
 
@@ -22,4 +24,5 @@ def build_retriever(cfg: dict) -> Retriever:
     return REGISTRY[kind](**cfg)
 
 
-__all__ = ["Candidates", "Retriever", "drop_self", "build_retriever", "BM25Retriever", "PhashBoostRetriever"]
+__all__ = ["Candidates", "Retriever", "drop_self", "build_retriever", "BM25Retriever", "PhashBoostRetriever",
+           "PrecomputedEmbeddingRetriever"]

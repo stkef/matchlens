@@ -22,7 +22,7 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 | 1 | BM25 on titles + global threshold | 0.917 | 0.679 | 1.0 ms |
 | 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | 0.682 | 1.8 ms |
 | 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
-| 3 | Text embeddings (multilingual) | — | — | — |
+| 3 | *Comparison:* text embeddings alone (best: bge-m3) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
 | 4 | Image embeddings | — | — | — |
 | 5 | Fusion (RRF → learned) | — | — | — |
 | 6 | + Reranker on top N | — | — | — |
@@ -125,8 +125,8 @@ docs/
 
 ## Status
 
-Rungs 1, 1b and 2 are done: F1 0.744 on validation (+0.275 over the no-model floor). Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Next: rung 3, multilingual text embeddings.
+Rungs 1–3 are done. Best so far: F1 0.744 (rung 2). Rung 3 showed text embeddings alone score below BM25, but find different matches: together they get 18% more correct matches than either alone. Its failure analysis is in
+[docs/ladder.md](docs/ladder.md). Next: rung 4 (image embeddings, on Kaggle), then rung 5 (fusion).
 
 ## Licence and data
 

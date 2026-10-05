@@ -189,3 +189,17 @@ def test_phash_boost_adds_near_identical_photos_as_certain_matches():
     res = drop_self(r.search(corpus, 3), 2)
     assert res.indices[0, 0] == 1 and res.scores[0, 0] == 1.0  # no shared words, but same photo
     assert 2 not in res.indices[0]                             # 32 bits apart: not a near-duplicate
+
+
+def test_dense_retriever_uses_cosine_over_precomputed_vectors(tmp_path):
+    from matchlens.retrievers import build_retriever
+    vecs = np.array([[1, 0], [0.8, 0.6], [0, 1]], dtype=np.float16)
+    np.savez(tmp_path / "emb.npz", posting_id=np.array(["a", "b", "c"]), vectors=vecs)
+    corpus = pd.DataFrame({"posting_id": ["a", "b", "c"], "title": ["x", "y", "z"]})
+    r = build_retriever({"type": "dense", "path": str(tmp_path / "emb.npz")})
+    r.fit(corpus)
+    res = r.search(corpus.iloc[[0]], 3)
+    assert res.indices[0].tolist() == [0, 1, 2]
+    assert res.scores[0].tolist() == pytest.approx([1.0, 0.8, 0.0], abs=1e-3)
+    with pytest.raises(KeyError):
+        r.search(pd.DataFrame({"posting_id": ["zzz"], "title": ["?"]}), 1)

@@ -1,0 +1,21 @@
+name = "rung03_e5_base"
+rung = 3
+description = "Comparison: dense title embeddings alone, intfloat/multilingual-e5-base (278M, 768-d)"
+
+[data]
+csv = "C:/data/shopee/train.csv"  # kept outside OneDrive; change to wherever you downloaded it
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "dense"
+# Computed on Kaggle's GPU by kaggle/embed_titles; see docs/kaggle.md.
+path = "C:/data/shopee/embeddings/emb_e5_base.npz"
+
+[eval]
+k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
+latency_sample = 200
+
+[cost]
+usd_per_hour = 0.10

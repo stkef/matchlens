@@ -95,11 +95,34 @@ validation improves.
 
 ## Rung 3 — Text embeddings
 
-- **Kind:** comparison
-- **Candidates:** `intfloat/multilingual-e5-base`, `paraphrase-multilingual-mpnet-base-v2`, `BAAI/bge-m3`
+- **Kind:** comparison (each model judged alone; combining comes at rung 5)
+- **Config:** `configs/rung03_<model>.toml`; vectors computed on a Kaggle GPU (see [kaggle.md](kaggle.md))
 - **Hypothesis:** Fixes paraphrases and Indonesian/English mixes that BM25 misses; likely worse on exact
   specs.
-- **Result / verdict:** _pending_
+- **Result (val, pool 27,431):**
+
+  | Model | Size | Recall@50 | MRR | F1 | Threshold | Embed 1 query (CPU p95) |
+  |---|---|---|---|---|---|---|
+  | BM25 + units (rung 1b, reference) | — | 0.918 | 0.784 | 0.682 | 0.57 | — |
+  | **BAAI/bge-m3** | 568M, 1024-d | **0.900** | **0.774** | **0.673** | 0.74 | 274 ms |
+  | intfloat/multilingual-e5-base | 278M, 768-d | 0.855 | 0.729 | 0.644 | 0.93 | 76 ms |
+  | paraphrase-multilingual-mpnet-base-v2 | 278M, 768-d | 0.742 | 0.642 | 0.590 | 0.85 | 77 ms |
+
+  GPU time to embed all 34,250 titles: bge-m3 31 s, the others ~12 s (a laptop CPU needs ~80 min for
+  bge-m3). Search over the stored vectors adds 4–13 ms.
+- **Hypothesis check — complementary, not better.** Of 13,138 true pairs, at each model's threshold:
+  BM25 says a correct "yes" to 6,576, bge-m3 to 6,301; **1,480 only BM25 gets and 1,205 only bge-m3
+  gets**; together 7,781 (+18% over BM25). In the top 50, either one finds 93.9% of all true pairs.
+  - bge-m3 wins on meaning: "Sarung Pouch Bag HP Waterproof Anti Air" ≈ "WATERPROOF CASE HP / airbag";
+    "TATAKAN MOUSE" ≈ "ALAS UNTUK MOUSE" (two Indonesian words for mat).
+  - BM25 wins on exact words: "Pisau Apel Stainless" vs "Pisau Apel Warna Random"; "Buku Tulis Campus
+    50 Lembar".
+- **Verdict:** bge-m3 is the text model carried forward. Alone it does not beat BM25, so it is not
+  added as a rung on its own; it goes into fusion (rung 5), where the 18% of extra matches can count.
+- **Costs to watch:** embedding a new query with bge-m3 takes ~270 ms on CPU, most of the 300 ms
+  budget. multilingual-e5-base is 3.5× faster for −0.03 F1; revisit if latency becomes the limit.
+- **Note:** e5's best threshold is 0.93 because its similarities are squeezed into a narrow, high
+  range; thresholds are not comparable between models, which is why each rung tunes its own.
 
 ## Rung 4 — Image embeddings
 
