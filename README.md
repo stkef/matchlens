@@ -50,7 +50,7 @@ Details: [docs/architecture.md](docs/architecture.md).
 Requires Python 3.12.
 
 ```bash
-git clone https://github.com/<you>/matchlens.git
+git clone https://github.com/stkef/matchlens.git
 cd matchlens
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt      # macOS/Linux: .venv/bin/python
