@@ -203,3 +203,27 @@ def test_dense_retriever_uses_cosine_over_precomputed_vectors(tmp_path):
     assert res.scores[0].tolist() == pytest.approx([1.0, 0.8, 0.0], abs=1e-3)
     with pytest.raises(KeyError):
         r.search(pd.DataFrame({"posting_id": ["zzz"], "title": ["?"]}), 1)
+
+
+def test_vector_stores_agree_with_exact_search(tmp_path):
+    from matchlens.stores import build_store
+    rng = np.random.default_rng(0)
+    corpus = rng.normal(size=(300, 16)).astype(np.float32)
+    corpus /= np.linalg.norm(corpus, axis=1, keepdims=True)
+    queries = corpus[:20]
+    exact = build_store({"type": "numpy"})
+    exact.build(corpus)
+    ref_idx, ref_sc = exact.search(queries, 5)
+    for cfg in [{"type": "faiss", "index": "flat", "path": str(tmp_path / "t.faiss")},
+                {"type": "qdrant", "path": str(tmp_path / "qdrant"), "collection": "image_test"}]:
+        store = build_store(cfg)
+        store.build(corpus)
+        idx, sc = store.search(queries, 5)
+        assert (idx == ref_idx).all(), cfg["type"]
+        assert sc == pytest.approx(ref_sc, abs=1e-4)
+        if hasattr(store, "close"):
+            store.close()
+    # A saved FAISS index is reused when the vectors are unchanged.
+    reused = build_store({"type": "faiss", "index": "flat", "path": str(tmp_path / "t.faiss")})
+    reused.build(corpus)
+    assert (reused.search(queries, 5)[0] == ref_idx).all()

@@ -155,9 +155,16 @@ validation improves.
 
 ## Rung 7 — Fine-tuned embeddings with hard negatives
 
-- **Kind:** additive
+- **Kind:** additive, with an internal comparison
 - **Hypothesis:** Training on the system's own mistakes (from the **train** split) teaches the encoders
   that 64 GB ≠ 128 GB.
+- **Comparison inside the rung — what are the labels worth?**
+  1. **SimCSE (self-supervised, no labels):** the same title passed through the model twice with
+     different dropout should land close; other titles in the batch should land far. Uses only raw
+     train titles.
+  2. **Supervised contrastive with hard negatives:** uses `label_group` to pull true matches together
+     and push the system's own look-alike mistakes apart.
+  Both start from the best rung 3 model, train on Kaggle, and are scored the same way.
 - **Result / verdict:** _pending_
 
 ## Rung 8 — Per-cluster / adaptive thresholds

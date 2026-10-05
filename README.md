@@ -113,6 +113,7 @@ matchlens/
   data.py          listing loader, group-level split + manifest
   text.py          title decoding and tokenisation
   retrievers/      Retriever interface + implementations (bm25.py)
+  stores.py        vector stores: FAISS (text), Qdrant (images), numpy (exact reference)
   metrics.py       recall@k, MRR, competition F1, precision@recall
   threshold.py     global threshold tuning on validation
   evaluate.py      the harness: one config in, one ledger row out

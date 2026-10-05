@@ -11,6 +11,12 @@ type = "dense"
 # Trained locally: python -m matchlens.fasttext_embed
 path = "C:/data/shopee/embeddings/emb_fasttext_idf.npz"
 
+[retriever.store]
+# Text vectors live in FAISS (exact flat index; saved to disk and reused). Images use Qdrant (rung 4).
+type = "faiss"
+index = "flat"
+path = "C:/data/shopee/stores/faiss_text_fasttext_idf.index"
+
 [eval]
 k = 50
 # Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.

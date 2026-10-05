@@ -5,3 +5,5 @@ scipy==1.18.1
 pytest==9.1.1
 gensim==4.4.0      # FastText (rung 3)
 kaggle==2.2.4      # pushing notebooks and fetching their outputs
+faiss-cpu==1.15.1  # text vector store
+qdrant-client==1.19.1  # image vector store (local mode)

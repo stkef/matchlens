@@ -49,8 +49,44 @@ Cosine similarity (rungs 3–4) is already bounded and needs no extra step.
 | `threshold.py` | all | Grid search 0.00–1.00 in steps of 0.01 for best mean F1; ties go to the stricter threshold |
 | `evaluate.py` | all | Config in, metrics out; test split locked behind `--unlock-test` |
 
-Planned (not built yet): near-dup filter (rung 2), embedding retrievers with a vector cache (3–4),
-fusion (5), reranker (6), fine-tuning (7), per-cluster thresholds (8), error-analysis view, demo app, API.
+Built: BM25 (1), canonical units (1b), phash near-dups (2), dense retrieval over FAISS/Qdrant stores (3).
+Planned: image embeddings (4), fusion (5), reranker (6), fine-tuning (7), per-cluster thresholds (8), error-analysis view, demo app, API.
+
+## Vector stores
+
+Embedding vectors live in a vector store (`matchlens/stores.py`), which answers "which stored vectors
+are closest to this one?". Text and image vectors are kept in **separate stores**: they come from
+different models with different sizes and are tuned and replaced independently. Fusion (rung 5) asks
+both and merges the answers.
+
+| Data | Store | Why |
+|---|---|---|
+| Text vectors (rung 3+) | **FAISS** (`IndexFlatIP`, exact) | In-process library, the industry standard for fast similarity search. Index saved to disk and reused |
+| Image vectors (rung 4+) | **Qdrant** (local mode) | A real vector database. Local mode is a folder on disk with no server; the same code can point at a Qdrant server later |
+| Reference | numpy brute force | Exact answer that every store is tested against |
+
+Measured on the 27,431 bge-m3 vectors (1024-d), 3,366 val queries, laptop CPU:
+
+| Store | Build | Per query (batch) | Same top 50 as exact | F1 |
+|---|---|---|---|---|
+| numpy (exact) | 0.1 s | 0.7 ms | 100% | 0.6732 |
+| FAISS flat (exact) | 0.7 s | 0.5 ms | 99.97% | 0.6732 |
+| FAISS HNSW (approximate) | 6.6 s | 0.5 ms | 98.4% | 0.6731 |
+| Qdrant local | 262 s | 163 ms | 99.7% (200-query sample) | — |
+
+- **Exact vs approximate.** HNSW checks only part of the corpus via a graph, so it can miss a
+  neighbour (98.4% overlap) — it pays off at millions of vectors, not 27k. Flat is used for now.
+- **Qdrant local mode is slow at this size** (it warns above 20,000 points): fine for building once
+  and evaluating, not for serving. A Qdrant server (Docker) builds an HNSW index and would be fast,
+  but costs RAM this laptop does not have to spare.
+- Both stores fingerprint their vectors and rebuild automatically if the pool changes (val vs test).
+
+```toml
+[retriever.store]
+type = "faiss"          # or "qdrant" (path + collection) or "numpy"
+index = "flat"          # or "hnsw"
+path = "C:/data/shopee/stores/faiss_text_bge_m3.index"
+```
 
 ## Adding a rung
 

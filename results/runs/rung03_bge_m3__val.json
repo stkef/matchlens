@@ -1,9 +1,9 @@
 {
-  "timestamp": "2026-10-05T11:34:28+00:00",
+  "timestamp": "2026-10-05T17:26:09+00:00",
   "name": "rung03_bge_m3",
   "rung": 3,
   "split": "val",
-  "git_sha": "89b46ab",
+  "git_sha": "4969933",
   "config": {
     "name": "rung03_bge_m3",
     "rung": 3,
@@ -14,7 +14,12 @@
     },
     "retriever": {
       "type": "dense",
-      "path": "C:/data/shopee/embeddings/emb_bge_m3.npz"
+      "path": "C:/data/shopee/embeddings/emb_bge_m3.npz",
+      "store": {
+        "type": "faiss",
+        "index": "flat",
+        "path": "C:/data/shopee/stores/faiss_text_bge_m3.index"
+      }
     },
     "eval": {
       "k": 50,
@@ -32,14 +37,14 @@
     "pool_size": 27431,
     "recall@10": 0.7996658932933444,
     "recall@50": 0.9001330008293023,
-    "mrr": 0.7742189451070443,
+    "mrr": 0.7740208860854559,
     "f1": 0.673177055182879,
     "threshold": 0.74,
     "precision@recall0.9": NaN,
-    "p50_ms": 4.712300000392133,
-    "p95_ms": 5.270049998580361,
-    "usd_per_1k_queries": 0.00013238269444678332,
-    "fit_s": 0.051470599999447586
+    "p50_ms": 11.64625000092201,
+    "p95_ms": 23.389269999461177,
+    "usd_per_1k_queries": 0.00036691463888625247,
+    "fit_s": 0.5196904999975231
   },
   "threshold_curve": {
     "thresholds": [

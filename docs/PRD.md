@@ -79,7 +79,7 @@ Rungs come in two kinds. **Comparison rungs** swap a component and are judged on
 | 4 | comparison | Image embeddings | Listings with useless titles but matching photos | | | |
 | 5 | additive | Fusion of BM25 + best text + best image (RRF, then learned) | Each retriever catches what the others miss | | | |
 | 6 | additive | + Reranker on top N (title cross-encoder + image-sim feature) | Near-misses ranked above true matches | | | |
-| 7 | additive | Fine-tuned text + image towers with hard negatives | Look-alike variants (storage, colour, size) | | | |
+| 7 | additive | Fine-tuned text + image towers with hard negatives (vs SimCSE, no labels) | Look-alike variants (storage, colour, size) | | | |
 | 8 | additive | Per-cluster thresholds (clusters inferred from embeddings) and per-query adaptive cut-offs | Converts good ranking into good yes/no decisions | | | |
 
 The write-up shows the ladder as a chart, with one paragraph per rung on what changed and why.
@@ -121,7 +121,7 @@ Cheap retrievers aim for high recall; the expensive reranker only sees the top N
 | FR-9 | Error-analysis view grouping false and missed matches by type | Must |
 | FR-10 | Demo app (title or photo in, ranked matches out, with which retriever found each) | Must |
 | FR-11 | HTTP API: `/match` for one listing, `/dedupe` for a batch | Should |
-| FR-12 | Pluggable index backend (FAISS by default) | Could |
+| FR-12 | Pluggable vector stores: FAISS for text, Qdrant for images, numpy as exact reference (built) | Must |
 
 ## Non-functional targets
 
