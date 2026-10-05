@@ -13,11 +13,12 @@ from matchlens.text import tokenize
 class BM25Retriever:
     name = "bm25"
 
-    def __init__(self, k1: float = 1.2, b: float = 0.75, batch_size: int = 512):
+    def __init__(self, k1: float = 1.2, b: float = 0.75, batch_size: int = 512, canonical_units: bool = False):
         self.k1, self.b, self.batch_size = k1, b, batch_size
+        self.canonical_units = canonical_units
 
     def fit(self, corpus: pd.DataFrame) -> None:
-        docs = [tokenize(t) for t in corpus["title"]]
+        docs = [tokenize(t, self.canonical_units) for t in corpus["title"]]
         self.vocab: dict[str, int] = {}
         for doc in docs:
             for tok in doc:
@@ -53,7 +54,7 @@ class BM25Retriever:
         return sparse.csr_matrix((data, counts.indices, counts.indptr), shape=counts.shape)
 
     def search(self, queries: pd.DataFrame, k: int) -> Candidates:
-        q_counts = self._counts([tokenize(t) for t in queries["title"]])
+        q_counts = self._counts([tokenize(t, self.canonical_units) for t in queries["title"]])
         q_terms = (q_counts > 0).astype(np.float64)
         # Score of the query against itself treated as a document: the per-query normaliser.
         self_score = np.asarray(q_terms.multiply(self._weights(q_counts)).sum(axis=1)).ravel()

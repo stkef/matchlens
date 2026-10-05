@@ -168,3 +168,11 @@ def test_evaluate_end_to_end_and_test_lock(tmp_path):
     assert hard["metrics"]["recall@50"] <= val["recall@50"]
     with pytest.raises(ValueError):
         run({**cfg, "eval": {**cfg["eval"], "distractors": ["test"]}}, "val", results)
+
+
+def test_canonical_units_unify_spellings_and_scale():
+    assert tokenize("Profeline 400 gram", canonical_units=True) == tokenize("profeline 400gr", True) == ["profeline", "400g"]
+    assert tokenize("Beras 1 kg", True) == tokenize("Beras 1000 gr", True) == ["beras", "1000g"]
+    assert tokenize("Minyak 1,8 L", True) == ["minyak", "1800ml"]
+    assert tokenize("Samsung A52 128 GB", True) == ["samsung", "a52", "128gb"]  # other units untouched
+    assert tokenize("Profeline 400 gram") == ["profeline", "400gram"]  # default (rung 1) unchanged

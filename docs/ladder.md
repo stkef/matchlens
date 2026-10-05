@@ -38,6 +38,27 @@ validation improves.
 
 ---
 
+## Rung 1b — + canonical units
+
+- **Kind:** additive (tokenizer change; rung 1 stays reproducible via `canonical_units = false`)
+- **Config:** `configs/rung01b_bm25_units.toml`
+- **Hypothesis:** Rung 1 treats "400 gram", "400 gr" and "400gr" as different words, and "1 kg" vs
+  "1000 gr" as unrelated. Mapping every spelling to one unit and scale (`400g`, `1000g`, `1800ml`)
+  should recover those matches.
+- **Result (val, pool 27,431):** recall@50 0.918 (+0.001) · MRR 0.784 (+0.003) · **F1 0.682 (+0.004)**
+  at threshold 0.57 · p95 1.8 ms.
+- **Is the gain real?** Paired per-listing comparison: 607 listings better, 366 worse, 2,393 unchanged.
+  Bootstrap (5,000 resamples of listings): mean +0.0036, 95% interval [+0.0007, +0.0065], positive in
+  99.2% of resamples. Small but real.
+- **Why some got worse:** the biggest losers have no units at all ("Sepatu Hiking/ Mendaki/ Outdoor…").
+  They moved because the best global threshold shifted from 0.54 to 0.57, and one threshold applies to
+  everyone. Biggest winners: "Nivea … 75 gram" (+0.67), "Enfagrow … 1800 gram" (+0.56),
+  "Acnes Facial Wash 50gr/100gr" (+0.48).
+- **Verdict:** kept. Small because only some titles contain units; the remaining failures are about
+  meaning and look-alikes, which word matching cannot fix.
+
+---
+
 ## Rung 2 — + near-duplicate filter
 
 - **Kind:** additive
