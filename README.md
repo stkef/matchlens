@@ -123,7 +123,9 @@ docs/
 
 Rung 1 (BM25, split, metrics, harness) is built and tested; waiting on the first run against real data.
 
-## Data and licence
+## Licence and data
+
+Code: [MIT](LICENSE).
 
 The Shopee dataset is © its owners and distributed by Kaggle under the competition's rules. It is
 **not** included in this repository; download it yourself under those terms.
