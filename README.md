@@ -23,7 +23,7 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 | 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | 0.682 | 1.8 ms |
 | 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
 | 3 | *Comparison:* text embeddings alone, best = bge-m3 (also: e5, mpnet, FastText trained here) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
-| 4 | Image embeddings | — | — | — |
+| 4 | *Comparison:* image embeddings alone, cheapest within 0.01 F1 of best = SigLIP (also: DINOv2, CLIP, Swin V2) | 0.923 | 0.676 | 273 ms to embed the photo on CPU |
 | 5 | Fusion (RRF → learned) | — | — | — |
 | 6 | + Reranker on top N | — | — | — |
 | 7 | Fine-tuned embeddings with hard negatives | — | — | — |
@@ -127,7 +127,7 @@ docs/
 ## Status
 
 Rungs 1–3 are done. Best so far: F1 0.744 (rung 2). Rung 3 showed text embeddings alone score below BM25, but find different matches: together they get 18% more correct matches than either alone. Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Next: rung 4 (image embeddings, on Kaggle), then rung 5 (fusion).
+[docs/ladder.md](docs/ladder.md). Rung 4 (image embeddings) is measured; DINOv3 and Jina v4 are pending. Next: rung 5 (fusion).
 
 ## Licence and data
 

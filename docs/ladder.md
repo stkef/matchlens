@@ -136,9 +136,35 @@ validation improves.
 
 ## Rung 4 — Image embeddings
 
-- **Kind:** comparison
-- **Hypothesis:** Rescues listings with useless titles but matching photos.
-- **Result / verdict:** _pending_
+- **Kind:** comparison (each model judged alone; combining comes at rung 5)
+- **Config:** `configs/rung04_<model>.toml`; vectors computed on a Kaggle GPU by
+  [`kaggle/embed_images`](../kaggle/embed_images) — the 1.7 GB of photos never leave Kaggle.
+- **Hypothesis:** Rescues listings with useless titles but matching photos, including *different*
+  photos of the same product, which phash (rung 2) cannot match.
+- **Selection rule (agreed before results):** the cheapest model within 0.01 F1 of the best.
+- **Result (val, pool 27,431; models compared in FAISS):**
+
+  | Model | Learned from | Dim | Recall@50 | MRR | F1 | Threshold | Embed 1 photo (CPU p50) | GPU time, 34k photos |
+  |---|---|---|---|---|---|---|---|---|
+  | facebook/dinov2-base | images only (self-supervised) | 768 | 0.868 | 0.784 | **0.682** | 0.84 | 311 ms | 141 s |
+  | **google/siglip-base-patch16-224** | images + captions | 768 | **0.923** | **0.817** | 0.676 | 0.84 | **273 ms** | 158 s |
+  | microsoft/swinv2-base (ImageNet) | labelled categories | 1024 | 0.778 | 0.704 | 0.634 | 0.91 | 375 ms | 250 s |
+  | openai/clip-vit-base-patch32 | images + captions | 512 | 0.755 | 0.683 | 0.634 | 0.88 | 109 ms | 409 s* |
+  | facebook/dinov3-vitb16 | images only | — | — | — | — | — | — | not run: gated model, no HF token at run time |
+  | jinaai/jina-embeddings-v4 | images + text | — | — | — | — | — | — | failed: `KeyError: 'default'` in its remote code |
+
+  \* CLIP ran first, so its time includes Kaggle's first cold read of the 34k photos from disk.
+- **Verdict:** **SigLIP** is carried forward: within 0.006 F1 of DINOv2, 12% cheaper per photo, and
+  clearly better at *finding* candidates (recall@50 0.923 vs 0.868, MRR 0.817 vs 0.784), which is what
+  fusion (rung 5) needs.
+- **Observations:**
+  - The best image model alone (0.682) is roughly level with BM25 + units (0.682) and bge-m3 (0.673):
+    three very different signals of similar strength — promising for fusion.
+  - Swin V2, trained to name *categories*, is weakest at recognising *the same item*, as expected.
+  - CLIP B/32 is the cheapest per photo (109 ms) but 0.05 F1 behind: outside the 0.01 rule.
+- **Pending:** DINOv3 (needs Hugging Face licence + `HF_TOKEN` Kaggle secret; re-run with
+  `RUN_ONLY = ["dinov3_b"]`), Jina v4 (library version mismatch to debug). The winner is then loaded
+  into Qdrant, the image vector store.
 
 ## Rung 5 — Fusion
 

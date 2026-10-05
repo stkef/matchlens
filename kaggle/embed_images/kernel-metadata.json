@@ -1,0 +1,13 @@
+{
+  "id": "pradeep129009090/matchlens-embed-images",
+  "title": "matchlens-embed-images",
+  "code_file": "embed_images.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": ["shopee-product-matching"],
+  "kernel_sources": []
+}

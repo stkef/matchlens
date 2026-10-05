@@ -27,6 +27,13 @@ python -m matchlens.evaluate configs/rung03_bge_m3.toml --split val
 Requirements: competition rules accepted, and a phone-verified Kaggle account (needed for GPU and
 for internet access, which the notebook uses to download the models and this repo's title cleaner).
 
+## Rung 4: image embeddings
+
+Notebook source: [`kaggle/embed_images/`](../kaggle/embed_images). Same flow as rung 3 with
+`matchlens-embed-images`; outputs are `emb_img_<name>.npz/.json`. Models that fail are logged in their
+`.json` and skipped. Gated models (DINOv3) need a Hugging Face read token stored as a Kaggle secret
+named `HF_TOKEN` and attached to the notebook. To re-run selected models only, set `RUN_ONLY`.
+
 ## Why not local Ollama?
 
 Tried first. Ollama runs the same open models, but on this laptop it computes on the CPU: bge-m3
