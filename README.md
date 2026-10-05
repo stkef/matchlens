@@ -12,12 +12,14 @@ one technique at a time, measure what each one gained or cost, and explain where
 
 ## Results
 
-All numbers are on the validation split of Shopee – Price Match Guarantee, matching within the split.
-The test split stays locked until the ladder is frozen.
+Validation split of Shopee – Price Match Guarantee: 3,366 query listings searched against a pool of
+27,431 (validation + all training listings as distractors). The test split stays locked until the
+ladder is frozen. For scale: predicting "each listing matches only itself" already scores **F1 0.469**.
 
 | # | Rung | Recall@50 | F1 | p95 latency |
 |---|---|---|---|---|
-| 1 | BM25 on titles + global threshold | — | — | — |
+| 0 | No model (each listing matches only itself) | — | 0.469 | — |
+| 1 | BM25 on titles + global threshold | 0.917 | **0.679** | 1.0 ms |
 | 2 | + near-duplicate filter (MinHash, image phash) | — | — | — |
 | 3 | Text embeddings (multilingual) | — | — | — |
 | 4 | Image embeddings | — | — | — |
@@ -75,8 +77,9 @@ python -m pytest -q
    unzip data/raw/shopee-product-matching.zip -d data/raw
    ```
 
-   Only `train.csv` has labels, so all splits are cut from it. The images are large; keep them out of
-   synced folders (OneDrive, Dropbox) and point `[data] csv` in the config at wherever they live.
+   Only `train.csv` has labels, so all splits are cut from it. Rung 1 needs only that file
+   (`-f train.csv`, ~2.5 MB). The images are ~1.7 GB; keep them out of synced folders (OneDrive,
+   Dropbox) and point `[data] csv` in the config at wherever they live.
 
 2. Create the split (once; the manifest records the source file's SHA-256 and refuses to silently change):
 
@@ -121,7 +124,8 @@ docs/
 
 ## Status
 
-Rung 1 (BM25, split, metrics, harness) is built and tested; waiting on the first run against real data.
+Rung 1 (BM25 baseline) is done: F1 0.679 on validation. Its failure analysis is in
+[docs/ladder.md](docs/ladder.md). Next: rung 2, the near-duplicate filter.
 
 ## Licence and data
 

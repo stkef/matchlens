@@ -1,0 +1,24 @@
+{
+  "source_csv": "C:/data/shopee/train.csv",
+  "source_sha256": "82b8ec57e81b603e00c63779b7eeea69a2bd7d9cbb48377657cf547b422f9175",
+  "seed": 42,
+  "fractions": [
+    0.7,
+    0.1,
+    0.2
+  ],
+  "counts": {
+    "train": {
+      "listings": 24065,
+      "groups": 7710
+    },
+    "val": {
+      "listings": 3366,
+      "groups": 1101
+    },
+    "test": {
+      "listings": 6819,
+      "groups": 2203
+    }
+  }
+}

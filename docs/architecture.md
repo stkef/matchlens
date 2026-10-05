@@ -5,7 +5,7 @@
 ```mermaid
 flowchart LR
     CSV[train.csv] --> SPLIT[data.py<br/>group split]
-    SPLIT --> POOL[Split pool<br/>val / test]
+    SPLIT --> POOL[Pool<br/>split + train distractors]
     POOL --> FIT[retriever.fit]
     POOL --> SEARCH[retriever.search k+1]
     FIT --> SEARCH
@@ -67,7 +67,7 @@ name = "rung01_bm25"        # used for result file names; must be unique per run
 rung = 1
 
 [data]
-csv = "data/raw/train.csv"
+csv = "C:/data/shopee/train.csv"
 split = "data/splits/split_v1.csv"
 
 [retriever]
@@ -77,6 +77,7 @@ b = 0.75
 
 [eval]
 k = 50                      # candidates kept per query
+distractors = ["train"]     # extra splits in the pool: retrievable, never queried (see evaluation.md)
 latency_sample = 200        # queries timed one at a time for p50/p95
 
 [cost]

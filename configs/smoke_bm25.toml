@@ -14,6 +14,8 @@ b = 0.75
 
 [eval]
 k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
 latency_sample = 50
 
 [cost]

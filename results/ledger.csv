@@ -1,0 +1,2 @@
+timestamp,name,rung,split,n_queries,pool_size,recall@10,recall@50,mrr,f1,threshold,precision@recall0.9,p50_ms,p95_ms,usd_per_1k_queries,fit_s,git_sha
+2026-10-05T10:58:09+00:00,rung01_bm25,1,val,3366,27431,0.8116,0.9173,0.7815,0.6787,0.54,0.0711,0.5923,0.9693,1.8e-05,0.2798,17472c3

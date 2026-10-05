@@ -1,8 +1,9 @@
 """Evaluation metrics, exactly as defined in docs/PRD.md.
 
 All functions take self-free candidates (see retrievers.base.drop_self) plus the label_group of every
-pool row. "True matches" of a query are the other rows in its group; self always counts as predicted
-and as truth for F1, matching the Shopee competition metric.
+pool row. The queries are the first n pool rows (n = number of candidate rows); any rows after them are
+distractors that can be retrieved but are never queried. "True matches" of a query are the other rows
+in its group; self always counts as predicted and as truth for F1, matching the Shopee competition metric.
 """
 
 from __future__ import annotations
@@ -16,18 +17,18 @@ def match_matrix(cands: Candidates, labels: np.ndarray) -> np.ndarray:
     """(n, k) bool: candidate j of query i is a true match."""
     valid = cands.indices >= 0
     cand_labels = labels[np.where(valid, cands.indices, 0)]
-    return valid & (cand_labels == labels[:, None])
+    return valid & (cand_labels == labels[:len(cands.indices), None])
 
 
-def group_sizes(labels: np.ndarray) -> np.ndarray:
-    """Size of each row's group (including itself)."""
+def group_sizes(labels: np.ndarray, n_queries: int | None = None) -> np.ndarray:
+    """Size of each query row's group within the whole pool (including itself)."""
     _, inverse, counts = np.unique(labels, return_inverse=True, return_counts=True)
-    return counts[inverse]
+    return counts[inverse][:n_queries]
 
 
 def recall_at_k(cands: Candidates, labels: np.ndarray, k: int) -> float:
     hits = match_matrix(cands, labels)[:, :k].sum(axis=1)
-    others = group_sizes(labels) - 1
+    others = group_sizes(labels, len(hits)) - 1
     has_match = others > 0
     if not has_match.any():
         return float("nan")
@@ -36,7 +37,7 @@ def recall_at_k(cands: Candidates, labels: np.ndarray, k: int) -> float:
 
 def mrr(cands: Candidates, labels: np.ndarray) -> float:
     is_match = match_matrix(cands, labels)
-    has_match = group_sizes(labels) > 1
+    has_match = group_sizes(labels, len(is_match)) > 1
     first = np.argmax(is_match, axis=1)
     rr = np.where(is_match.any(axis=1), 1.0 / (first + 1), 0.0)
     return float(rr[has_match].mean()) if has_match.any() else float("nan")
@@ -50,8 +51,8 @@ def f1_per_listing(cands: Candidates, labels: np.ndarray, threshold: float) -> n
 def f1_curve(cands: Candidates, labels: np.ndarray, thresholds: np.ndarray) -> np.ndarray:
     """(n_thresholds, n_queries) per-listing F1 for every threshold, vectorised."""
     is_match = match_matrix(cands, labels)
-    truth = group_sizes(labels)
-    out = np.empty((len(thresholds), len(labels)))
+    truth = group_sizes(labels, len(is_match))
+    out = np.empty((len(thresholds), len(is_match)))
     for t_i, t in enumerate(thresholds):
         selected = (cands.indices >= 0) & (cands.scores >= t)
         tp = 1 + (selected & is_match).sum(axis=1)
@@ -69,7 +70,7 @@ def precision_at_recall(cands: Candidates, labels: np.ndarray, target_recall: fl
     is_match = match_matrix(cands, labels)
     valid = cands.indices >= 0
     scores, hits = cands.scores[valid], is_match[valid]
-    total_pos = int((group_sizes(labels) - 1).sum())
+    total_pos = int((group_sizes(labels, len(is_match)) - 1).sum())
     if total_pos == 0 or len(scores) == 0:
         return float("nan")
     order = np.argsort(-scores, kind="stable")

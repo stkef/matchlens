@@ -3,6 +3,8 @@
     python -m matchlens.evaluate configs/rung01_bm25.toml --split val
     python -m matchlens.evaluate configs/rung01_bm25.toml --split test --unlock-test
 
+Queries are the listings of --split. The candidate pool is those listings plus any [eval] distractors
+splits (e.g. ["train"]): listings from other products that can be retrieved but are never queried.
 Validation runs tune the threshold; test runs reuse the threshold from that config's validation run.
 Every run writes results/runs/<name>__<split>.json and appends one row to results/ledger.csv.
 """
@@ -19,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from matchlens import metrics
 from matchlens.data import load_split_frame
@@ -26,7 +29,7 @@ from matchlens.retrievers import build_retriever, drop_self
 from matchlens.threshold import tune_threshold
 
 LEDGER_COLUMNS = [
-    "timestamp", "name", "rung", "split", "n_queries", "recall@10", "recall@50", "mrr", "f1", "threshold",
+    "timestamp", "name", "rung", "split", "n_queries", "pool_size", "recall@10", "recall@50", "mrr", "f1", "threshold",
     "precision@recall0.9", "p50_ms", "p95_ms", "usd_per_1k_queries", "fit_s", "git_sha",
 ]
 
@@ -48,13 +51,13 @@ def git_sha() -> str:
         return ""
 
 
-def measure_latency(retriever, pool, k: int, n_sample: int, seed: int = 0) -> np.ndarray:
+def measure_latency(retriever, queries, k: int, n_sample: int, seed: int = 0) -> np.ndarray:
     """Seconds per query, one query at a time, as an interactive caller would see it."""
     rng = np.random.default_rng(seed)
-    rows = rng.choice(len(pool), size=min(n_sample, len(pool)), replace=False)
+    rows = rng.choice(len(queries), size=min(n_sample, len(queries)), replace=False)
     times = []
     for r in rows:
-        query = pool.iloc[[r]]
+        query = queries.iloc[[r]]
         t0 = time.perf_counter()
         retriever.search(query, k)
         times.append(time.perf_counter() - t0)
@@ -69,7 +72,13 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
     k = int(eval_cfg["k"])
     usd_per_hour = float(cfg.get("cost", {}).get("usd_per_hour", 0.10))
 
-    pool = load_split_frame(cfg["data"]["csv"], cfg["data"]["split"], split)
+    distractors = list(eval_cfg.get("distractors", []))
+    if split in distractors or "test" in distractors:
+        raise ValueError("distractors may not include the evaluated split or the test split")
+    queries = load_split_frame(cfg["data"]["csv"], cfg["data"]["split"], split)
+    # Queries first, so query i is pool row i (drop_self and metrics rely on this).
+    pool = pd.concat([queries] + [load_split_frame(cfg["data"]["csv"], cfg["data"]["split"], d)
+                                  for d in distractors], ignore_index=True)
     labels = pool["label_group"].to_numpy()
 
     retriever = build_retriever(cfg["retriever"])
@@ -77,7 +86,7 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
     retriever.fit(pool)
     fit_s = time.perf_counter() - t0
 
-    cands = drop_self(retriever.search(pool, k + 1), k)
+    cands = drop_self(retriever.search(queries, k + 1), k)
 
     runs_dir = results_dir / "runs"
     if split == "val":
@@ -91,9 +100,10 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
         threshold = json.loads(val_run.read_text())["metrics"]["threshold"]
         curve = None
 
-    latency = measure_latency(retriever, pool, k + 1, int(eval_cfg["latency_sample"]))
+    latency = measure_latency(retriever, queries, k + 1, int(eval_cfg["latency_sample"]))
     m = {
-        "n_queries": len(pool),
+        "n_queries": len(queries),
+        "pool_size": len(pool),
         "recall@10": metrics.recall_at_k(cands, labels, 10),
         "recall@50": metrics.recall_at_k(cands, labels, 50) if k >= 50 else float("nan"),
         "mrr": metrics.mrr(cands, labels),
@@ -118,6 +128,11 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
 
 def append_ledger(path: Path, record: dict) -> None:
     new = not path.exists()
+    if not new:
+        with open(path, newline="") as f:
+            header = next(csv.reader(f), [])
+        if header != LEDGER_COLUMNS:
+            raise ValueError(f"{path} has an old column layout; move it aside before appending")
     row = {**{c: record.get(c, "") for c in LEDGER_COLUMNS}, **record["metrics"]}
     row = {c: (round(v, 6 if c.startswith("usd") else 4) if isinstance(v, float) else v)
            for c, v in row.items() if c in LEDGER_COLUMNS}

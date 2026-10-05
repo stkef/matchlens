@@ -48,7 +48,7 @@ There is **no category field**. Anything per-category needs inferred categories 
 
 **Splits.** Split by `label_group`, never by listing: 70% train (fine-tuning, hard-negative mining), 10% validation (thresholds, tuning, keep/drop decisions), 20% test (touched only for reported numbers, behind an explicit unlock flag). The split file is saved with a manifest (seed, fractions, SHA-256 of the source CSV) and never silently regenerated.
 
-**Evaluation protocol.** Matching is done *within* a split, as in the competition: every listing in the split is a query, and the candidate pool is all listings in that same split. A listing always matches itself.
+**Evaluation protocol.** Every listing in the evaluated split is a query. The candidate pool is that split **plus all training listings as distractors** (different products, so always wrong answers). Decided after rung 1: searching the val split alone (3.4k listings) gave BM25 F1 0.811, against 0.679 with distractors (27.4k), so the smaller pool flatters every model. Rung 7 also reports the no-distractor pool, because fine-tuning sees the training listings. A listing always matches itself; predicting only "self" scores F1 0.469 (the floor).
 
 ### Metrics
 
@@ -125,7 +125,7 @@ Cheap retrievers aim for high recall; the expensive reranker only sees the top N
 
 ## Non-functional targets
 
-First targets, to be revised once rung 1 gives a real baseline.
+Revisited after rung 1 (BM25: F1 0.679, recall@50 0.917, p95 1 ms on the distractor pool). Targets kept: +15 F1 means ≥ 0.83, ambitious but plausible on a 27k pool.
 
 | Area | Target |
 |---|---|

@@ -93,6 +93,17 @@ def test_precision_at_recall(toy):
     assert np.isnan(metrics.precision_at_recall(missing, np.array([5, 5]), 0.9))
 
 
+def test_metrics_with_distractor_rows_after_the_queries():
+    # Two queries (rows 0,1, group 1); rows 2,3 are distractors from group 9 and are never queried.
+    labels = np.array([1, 1, 9, 9])
+    cands = Candidates(np.array([[2, 1], [3, 0]]), np.array([[0.9, 0.8], [0.7, 0.6]]))
+    assert metrics.recall_at_k(cands, labels, 1) == 0.0
+    assert metrics.recall_at_k(cands, labels, 2) == 1.0
+    assert metrics.mrr(cands, labels) == pytest.approx(0.5)
+    # Threshold 0.85 lets in only the distractor for query 0: tp=1, |P|=2, |T|=2 -> 0.5; query 1 -> 2/3.
+    assert metrics.f1_per_listing(cands, labels, 0.85).tolist() == pytest.approx([0.5, 2 / 3])
+
+
 def test_threshold_tuner_finds_the_separating_cut():
     labels = np.array([1, 1, 2, 2])
     # True matches score 0.9, the look-alikes score 0.5: any threshold in (0.5, 0.9] is perfect.
@@ -149,3 +160,11 @@ def test_evaluate_end_to_end_and_test_lock(tmp_path):
     assert test["threshold"] == val["threshold"]
     ledger = pd.read_csv(results / "ledger.csv")
     assert ledger["split"].tolist() == ["val", "test"]
+
+    # Distractors grow the pool but not the query set, and can only make retrieval harder.
+    hard = run({**cfg, "name": "t_hard", "eval": {**cfg["eval"], "distractors": ["train"]}}, "val", results)
+    assert hard["metrics"]["n_queries"] == val["n_queries"]
+    assert hard["metrics"]["pool_size"] == val["n_queries"] + len(load_split_frame(csv, split_path, "train"))
+    assert hard["metrics"]["recall@50"] <= val["recall@50"]
+    with pytest.raises(ValueError):
+        run({**cfg, "eval": {**cfg["eval"], "distractors": ["test"]}}, "val", results)
