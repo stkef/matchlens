@@ -1,0 +1,20 @@
+name = "rung01_bm25"
+rung = 1
+description = "BM25 on titles, one global threshold on normalised score"
+
+[data]
+csv = "data/raw/train.csv"
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "bm25"
+k1 = 1.2
+b = 0.75
+
+[eval]
+k = 50
+latency_sample = 200
+
+[cost]
+# Assumed price of one CPU core-hour; used only for the cost-per-1k-queries estimate.
+usd_per_hour = 0.10

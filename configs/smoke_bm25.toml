@@ -1,0 +1,20 @@
+# Same as rung01_bm25 but on the synthetic dataset. Smoke test only: its numbers mean nothing.
+name = "smoke_bm25"
+rung = 0
+description = "BM25 on synthetic data"
+
+[data]
+csv = "data/synthetic/train.csv"
+split = "data/synthetic/split.csv"
+
+[retriever]
+type = "bm25"
+k1 = 1.2
+b = 0.75
+
+[eval]
+k = 50
+latency_sample = 50
+
+[cost]
+usd_per_hour = 0.10
