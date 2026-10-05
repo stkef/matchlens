@@ -59,12 +59,39 @@ validation improves.
 
 ---
 
-## Rung 2 — + near-duplicate filter
+## Rung 2 — + near-duplicate photos
 
 - **Kind:** additive
-- **Hypothesis:** Many listings are copies (same photo, near-identical title). MinHash on titles and
-  `image_phash` equality catch them cheaply.
-- **Result / verdict:** _pending_
+- **Config:** `configs/rung02_phash.toml` (`matchlens/retrievers/phash.py`)
+- **Hypothesis:** Many listings are copies (same photo, near-identical title). Perceptual image hashes
+  and title overlap catch them cheaply, without any model.
+- **Measured before building** (val queries vs pool of 27,431; all true pairs = 100%):
+
+  | Signal | Pairs flagged | Precision | Share of all true pairs |
+  |---|---|---|---|
+  | phash identical (0 bits apart) | 1,991 | 0.963 | 14.6% |
+  | phash ≤ 6 bits apart | 3,459 | 0.896 | 23.6% |
+  | phash ≤ 12 bits apart | 9,207 | 0.391 | 27.4% |
+  | title Jaccard ≥ 0.8 | 1,806 | 0.876 | 12.0% |
+  | rung 1b's own "yes" decisions | 11,674 | 0.563 | 50.1% |
+
+  Title near-duplicates added **zero** pairs beyond what rung 1b already says yes to (BM25 already
+  scores near-identical titles highly), so the planned title MinHash stage was dropped. Identical
+  photo hashes added 1,011 new pairs, 96.5% of them correct.
+- **Change:** any listing whose phash is within `max_dist` bits of the query's is added as a
+  certain match (score 1.0). Swept on val: 0 → F1 0.721, 2 → 0.735, 4 → 0.740, **6 → 0.744**,
+  8 → 0.741.
+- **Result (val):** recall@50 0.941 (+0.022) · MRR 0.848 (+0.064) · **F1 0.744 (+0.061 over 1b)** at
+  threshold 0.61 · p95 2.0 ms.
+- **Verdict:** kept. Biggest single gain so far, for the cost of an XOR and a bit count.
+- **What it gets wrong:** 430 of 4,065 photo matches (10.6%) are different products:
+  1. *Photo reused across variants* — "BEBELAC TAHAP 3 MADU 800GR" vs "Bebelac 4 Madu Vanila 800 gr".
+  2. *Generic or shop-banner photos* — "Wardah … Facial Wash" vs "Kodomo Sikat Gigi Anak".
+  3. *Likely label noise* — "Tolak Angin Cair" vs "Tolak Angin Cair": same title, same photo,
+     different label_group. → count these in the label audit.
+- **Note on MinHash:** MinHash/LSH approximates Jaccard similarity so it scales to millions of
+  listings. At 27k listings exact Jaccard is a single sparse matrix product, so it was measured
+  exactly instead.
 
 ## Rung 3 — Text embeddings
 

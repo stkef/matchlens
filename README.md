@@ -20,8 +20,8 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 |---|---|---|---|---|
 | 0 | No model (each listing matches only itself) | — | 0.469 | — |
 | 1 | BM25 on titles + global threshold | 0.917 | 0.679 | 1.0 ms |
-| 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | **0.682** | 1.8 ms |
-| 2 | + near-duplicate filter (MinHash, image phash) | — | — | — |
+| 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | 0.682 | 1.8 ms |
+| 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
 | 3 | Text embeddings (multilingual) | — | — | — |
 | 4 | Image embeddings | — | — | — |
 | 5 | Fusion (RRF → learned) | — | — | — |
@@ -125,8 +125,8 @@ docs/
 
 ## Status
 
-Rungs 1 and 1b (BM25, + canonical units) are done: F1 0.682 on validation. Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Next: rung 2, the near-duplicate filter.
+Rungs 1, 1b and 2 are done: F1 0.744 on validation (+0.275 over the no-model floor). Its failure analysis is in
+[docs/ladder.md](docs/ladder.md). Next: rung 3, multilingual text embeddings.
 
 ## Licence and data
 

@@ -176,3 +176,16 @@ def test_canonical_units_unify_spellings_and_scale():
     assert tokenize("Minyak 1,8 L", True) == ["minyak", "1800ml"]
     assert tokenize("Samsung A52 128 GB", True) == ["samsung", "a52", "128gb"]  # other units untouched
     assert tokenize("Profeline 400 gram") == ["profeline", "400gram"]  # default (rung 1) unchanged
+
+
+def test_phash_boost_adds_near_identical_photos_as_certain_matches():
+    from matchlens.retrievers import build_retriever
+    corpus = pd.DataFrame({
+        "title": ["kaos polos hitam", "baju anak", "sepatu lari"],
+        "image_phash": ["ffff0000ffff0000", "ffff0000ffff0001", "0000ffff0000ffff"],  # 0 and 1 differ by 1 bit
+    })
+    r = build_retriever({"type": "phash_boost", "max_dist": 2, "base": {"type": "bm25"}})
+    r.fit(corpus)
+    res = drop_self(r.search(corpus, 3), 2)
+    assert res.indices[0, 0] == 1 and res.scores[0, 0] == 1.0  # no shared words, but same photo
+    assert 2 not in res.indices[0]                             # 32 bits apart: not a near-duplicate
