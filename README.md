@@ -1,46 +1,62 @@
 # MatchLens
 
-Decides whether two product listings are the same product, from titles and photos, and proves every
-design choice with a measured experiment. Full plan: [docs/PRD.md](docs/PRD.md).
+**Is this the same product?** MatchLens decides whether two marketplace listings are the same product
+from their titles and photos — and backs every design choice with a measured experiment.
 
-## Status
+Marketplaces get the same product listed many times by different sellers, with messy titles, mixed
+languages and different photos. The hard part is look-alikes: the same phone in 64 GB and 128 GB reads
+and looks almost identical, but it is a different product.
 
-| # | Rung | Status |
-|---|---|---|
-| 1 | BM25 on titles + global threshold | **built**, waiting for real data |
-| 2–8 | near-dups, embeddings, fusion, reranker, fine-tuning, thresholds | not started |
+The point of this project is not one final score. It is a **ladder**: start from a simple baseline, add
+one technique at a time, measure what each one gained or cost, and explain where the system still fails.
 
-## Setup
+## Results
+
+All numbers are on the validation split of Shopee – Price Match Guarantee, matching within the split.
+The test split stays locked until the ladder is frozen.
+
+| # | Rung | Recall@50 | F1 | p95 latency |
+|---|---|---|---|---|
+| 1 | BM25 on titles + global threshold | — | — | — |
+| 2 | + near-duplicate filter (MinHash, image phash) | — | — | — |
+| 3 | Text embeddings (multilingual) | — | — | — |
+| 4 | Image embeddings | — | — | — |
+| 5 | Fusion (RRF → learned) | — | — | — |
+| 6 | + Reranker on top N | — | — | — |
+| 7 | Fine-tuned embeddings with hard negatives | — | — | — |
+| 8 | Per-cluster / adaptive thresholds | — | — | — |
+
+"—" means not run yet. Every row regenerates from one command (see [Reproduce](#reproduce)).
+
+## How it works
+
+```mermaid
+flowchart LR
+    Q[Listing<br/>title + photo] --> R1[BM25]
+    Q --> R2[Near-dup filter]
+    Q --> R3[Text embeddings]
+    Q --> R4[Image embeddings]
+    R1 & R2 & R3 & R4 --> F[Fusion]
+    F -->|top N| RR[Reranker]
+    RR --> D[Threshold] --> M[Matches]
+```
+
+Cheap retrievers aim for high recall; the expensive reranker only sees the top N, which keeps latency
+down. Mistakes on the training split become hard negatives for fine-tuning the encoders.
+Details: [docs/architecture.md](docs/architecture.md).
+
+## Quickstart
+
+Requires Python 3.12.
 
 ```bash
+git clone https://github.com/<you>/matchlens.git
+cd matchlens
 python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt   # Windows; use .venv/bin/python elsewhere
+.venv/Scripts/python -m pip install -r requirements.txt      # macOS/Linux: .venv/bin/python
 ```
 
-## Get the data
-
-Accept the competition rules on Kaggle ("Shopee - Price Match Guarantee"), set up your Kaggle API token,
-then:
-
-```bash
-kaggle competitions download -c shopee-product-matching -p data/raw
-unzip data/raw/shopee-product-matching.zip -d data/raw
-```
-
-Only `train.csv` has labels, so every split is cut from it.
-
-## Run
-
-```bash
-python -m matchlens.data                                         # create data/splits/split_v1.csv (+ manifest)
-python -m matchlens.evaluate configs/rung01_bm25.toml --split val
-```
-
-Each run writes `results/runs/<name>__<split>.json` and appends a row to `results/ledger.csv`.
-The test split is locked: `--split test --unlock-test`, only once the ladder is frozen. Test runs
-reuse the threshold tuned on validation.
-
-### Smoke test without the real data
+Try the whole pipeline on synthetic data (no download needed; the numbers mean nothing):
 
 ```bash
 python -m matchlens.synthetic
@@ -49,21 +65,65 @@ python -m matchlens.evaluate configs/smoke_bm25.toml --split val --results-dir d
 python -m pytest -q
 ```
 
-## Layout
+## Reproduce
 
-| Path | What |
+1. Accept the competition rules for "Shopee - Price Match Guarantee" on Kaggle and set up a Kaggle API
+   token, then download:
+
+   ```bash
+   kaggle competitions download -c shopee-product-matching -p data/raw
+   unzip data/raw/shopee-product-matching.zip -d data/raw
+   ```
+
+   Only `train.csv` has labels, so all splits are cut from it. The images are large; keep them out of
+   synced folders (OneDrive, Dropbox) and point `[data] csv` in the config at wherever they live.
+
+2. Create the split (once; the manifest records the source file's SHA-256 and refuses to silently change):
+
+   ```bash
+   python -m matchlens.data
+   ```
+
+3. Run a rung:
+
+   ```bash
+   python -m matchlens.evaluate configs/rung01_bm25.toml --split val
+   ```
+
+   This writes `results/runs/rung01_bm25__val.json` (all metrics plus the threshold curve) and appends
+   a row to `results/ledger.csv`.
+
+## Documentation
+
+| Doc | What's in it |
 |---|---|
-| `matchlens/data.py` | Listing loader, group-level split, split manifest |
-| `matchlens/text.py` | Title decoding and tokenisation (units glued to numbers: `128 GB` → `128gb`) |
-| `matchlens/retrievers/` | `Retriever` interface and implementations (`bm25.py`) |
-| `matchlens/metrics.py` | Recall@k, MRR, competition F1, precision@recall |
-| `matchlens/threshold.py` | Global threshold tuning on validation |
-| `matchlens/evaluate.py` | The harness: one config in, one ledger row out |
-| `configs/` | One TOML per rung |
+| [docs/PRD.md](docs/PRD.md) | Goals, scope, requirements, milestones, risks |
+| [docs/architecture.md](docs/architecture.md) | Components, data flow, the retriever contract, how to add a rung |
+| [docs/evaluation.md](docs/evaluation.md) | Splits, protocol and exact metric definitions |
+| [docs/ladder.md](docs/ladder.md) | One entry per rung: hypothesis, change, result, verdict |
 
-## Adding a rung
+## Project layout
 
-1. Implement `fit(corpus)` / `search(queries, k) -> Candidates` with per-query normalised scores
-   (1.0 = as similar as the query to itself).
-2. Register it in `matchlens/retrievers/__init__.py`.
-3. Add `configs/rungNN_<name>.toml` and run it on `val`.
+```
+matchlens/
+  data.py          listing loader, group-level split + manifest
+  text.py          title decoding and tokenisation
+  retrievers/      Retriever interface + implementations (bm25.py)
+  metrics.py       recall@k, MRR, competition F1, precision@recall
+  threshold.py     global threshold tuning on validation
+  evaluate.py      the harness: one config in, one ledger row out
+  synthetic.py     fake Shopee-format data for tests
+configs/           one TOML per rung
+results/           ledger.csv + per-run JSON (committed)
+tests/
+docs/
+```
+
+## Status
+
+Rung 1 (BM25, split, metrics, harness) is built and tested; waiting on the first run against real data.
+
+## Data and licence
+
+The Shopee dataset is © its owners and distributed by Kaggle under the competition's rules. It is
+**not** included in this repository; download it yourself under those terms.
