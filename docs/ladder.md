@@ -107,6 +107,12 @@ validation improves.
   | **BAAI/bge-m3** | 568M, 1024-d | **0.900** | **0.774** | **0.673** | 0.74 | 274 ms |
   | intfloat/multilingual-e5-base | 278M, 768-d | 0.855 | 0.729 | 0.644 | 0.93 | 76 ms |
   | paraphrase-multilingual-mpnet-base-v2 | 278M, 768-d | 0.742 | 0.642 | 0.590 | 0.85 | 77 ms |
+  | FastText, idf-weighted mean (trained here) | 2M, 100-d | 0.883 | 0.746 | 0.634 | 0.95 | **0.1 ms** |
+  | FastText, plain mean (trained here) | 2M, 100-d | 0.870 | 0.727 | 0.613 | 0.95 | 0.1 ms |
+
+  FastText (`python -m matchlens.fasttext_embed`) is skip-gram with 3–5 character n-grams, trained
+  only on the 24,065 **train** titles, on the laptop CPU in ~45 s. A title vector is the average of its
+  word vectors; weighting by idf (rare words count more, as in BM25) adds +0.021 F1.
 
   GPU time to embed all 34,250 titles: bge-m3 31 s, the others ~12 s (a laptop CPU needs ~80 min for
   bge-m3). Search over the stored vectors adds 4–13 ms.
@@ -117,6 +123,10 @@ validation improves.
     "TATAKAN MOUSE" ≈ "ALAS UNTUK MOUSE" (two Indonesian words for mat).
   - BM25 wins on exact words: "Pisau Apel Stainless" vs "Pisau Apel Warna Random"; "Buku Tulis Campus
     50 Lembar".
+- **FastText vs BM25:** 659 correct matches BM25 misses (+10% together, vs +18% for bge-m3), and 393
+  of those 659 bge-m3 finds too. Character n-grams overlap with what word matching already sees.
+  The cost story is the point: a model trained in 45 s on a laptop, 2,500× faster per query, gets
+  within 0.04 F1 of a 568M-parameter model.
 - **Verdict:** bge-m3 is the text model carried forward. Alone it does not beat BM25, so it is not
   added as a rung on its own; it goes into fusion (rung 5), where the 18% of extra matches can count.
 - **Costs to watch:** embedding a new query with bge-m3 takes ~270 ms on CPU, most of the 300 ms

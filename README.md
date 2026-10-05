@@ -22,7 +22,7 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 | 1 | BM25 on titles + global threshold | 0.917 | 0.679 | 1.0 ms |
 | 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | 0.682 | 1.8 ms |
 | 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
-| 3 | *Comparison:* text embeddings alone (best: bge-m3) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
+| 3 | *Comparison:* text embeddings alone, best = bge-m3 (also: e5, mpnet, FastText trained here) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
 | 4 | Image embeddings | — | — | — |
 | 5 | Fusion (RRF → learned) | — | — | — |
 | 6 | + Reranker on top N | — | — | — |
