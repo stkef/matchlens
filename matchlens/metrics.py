@@ -43,18 +43,24 @@ def mrr(cands: Candidates, labels: np.ndarray) -> float:
     return float(rr[has_match].mean()) if has_match.any() else float("nan")
 
 
-def f1_per_listing(cands: Candidates, labels: np.ndarray, threshold: float) -> np.ndarray:
+def f1_per_listing(cands: Candidates, labels: np.ndarray, threshold: float, min_matches: int = 0) -> np.ndarray:
     """Competition F1 for each query: predicted = self + candidates scoring >= threshold."""
-    return f1_curve(cands, labels, np.array([threshold]))[0]
+    return f1_curve(cands, labels, np.array([threshold]), min_matches)[0]
 
 
-def f1_curve(cands: Candidates, labels: np.ndarray, thresholds: np.ndarray) -> np.ndarray:
-    """(n_thresholds, n_queries) per-listing F1 for every threshold, vectorised."""
+def f1_curve(cands: Candidates, labels: np.ndarray, thresholds: np.ndarray, min_matches: int = 0) -> np.ndarray:
+    """(n_thresholds, n_queries) per-listing F1 for every threshold, vectorised.
+
+    min_matches: always predict at least this many top candidates, even below the threshold. Every
+    Shopee product has at least two listings, so every listing has at least one other match.
+    """
     is_match = match_matrix(cands, labels)
     truth = group_sizes(labels, len(is_match))
     out = np.empty((len(thresholds), len(is_match)))
     for t_i, t in enumerate(thresholds):
         selected = (cands.indices >= 0) & (cands.scores >= t)
+        if min_matches:
+            selected[:, :min_matches] |= cands.indices[:, :min_matches] >= 0
         tp = 1 + (selected & is_match).sum(axis=1)
         pred = 1 + selected.sum(axis=1)
         out[t_i] = 2 * tp / (pred + truth)

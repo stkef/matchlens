@@ -176,9 +176,41 @@ validation improves.
 
 ## Rung 5 — Fusion
 
-- **Kind:** additive
-- **Hypothesis:** Each retriever catches what the others miss; RRF first, then a learned weighting.
-- **Result / verdict:** _pending_
+- **Kind:** additive, in four measured steps
+- **Members:** BM25 + units (rung 1b), bge-m3 text (rung 3 winner), Marqo e-commerce images (rung 4
+  winner); the rung 2 phash rule stays on top (`phash_boost` wraps the fusion). Embedding members are
+  searched in FAISS (identical results to Qdrant, much faster to evaluate).
+- **Hypothesis:** rungs 3–4 showed the signals are complementary (e.g. BM25 + bge-m3 find 18% more
+  correct matches together), so combining them should beat the best single pipeline (rung 2, 0.744).
+- **Results (val, pool 27,431):**
+
+  | Step | Change | Recall@50 | MRR | F1 | Δ F1 | p95 search |
+  |---|---|---|---|---|---|---|
+  | 2 (reference) | BM25 + units + phash | 0.941 | 0.848 | 0.744 | | 2 ms |
+  | **5a** | Reciprocal rank fusion (`rrf_k` 60) | **0.980** | 0.861 | 0.750 | +0.006 | 29 ms |
+  | **5b** | Learned weights (logistic regression) | 0.976 | **0.879** | 0.781 | **+0.031** | — |
+  | **5c** | + always keep the best candidate (`min_matches = 1`) | 0.976 | 0.879 | 0.790 | +0.008 | — |
+  | **5d** | + neighbour voting (`expand_k` 3, `expand_alpha` 3) | 0.978 | 0.877 | **0.793** | +0.004 | 90 ms |
+
+  Search latency excludes embedding a brand-new query on CPU (bge-m3 ~274 ms + Marqo ~257 ms), which
+  is the real cost of serving and is over the 300 ms budget — see rung 6 notes and the PRD.
+- **5a — RRF:** uses only ranks, so it finds almost everything (98% of true matches in the top 50,
+  from 94%) but decides poorly: a candidate ranked 2nd by every member scores the same however
+  confident each member was.
+- **5b — learned weights:** a 7-parameter logistic regression over each member's score and 1/rank,
+  trained on **2.7M train-split pairs** (118,688 true matches) with `python -m matchlens.fusion_train`;
+  validation is only used for the threshold. Learned weights (score / 1-over-rank):
+  Marqo images **+5.1 / +3.1**, BM25 **+4.1** / −0.5, bge-m3 **+1.8** / +0.6. The photo model is
+  trusted most, BM25 next; the text model adds the least once the others are present.
+- **5c — at least one match:** every Shopee product has 2+ listings, so every listing has at least one
+  true match. Keeping the top candidate even when it is below the threshold turns many "matched only
+  itself" answers into a correct pair. A trick used by top competition teams.
+- **5d — neighbour voting:** each embedding is blended with its 3 nearest neighbours (weights =
+  similarity³) on both the query and database side, so a listing close to *some* members of a group is
+  pulled towards the whole group. Fusion weights retrained for the expanded members. Paired bootstrap
+  vs 5c: 527 listings better, 462 worse, mean **+0.0039**, 95% interval [+0.0005, +0.0072], positive in
+  98.8% of resamples: small but real, for 3× the search time (still well under budget).
+- **Verdict:** kept, all four steps. **F1 0.744 → 0.793 (+0.049)**, the second-largest gain after rung 2.
 
 ## Rung 6 — Reranker
 

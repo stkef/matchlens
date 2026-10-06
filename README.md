@@ -24,7 +24,7 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 | 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
 | 3 | *Comparison:* text embeddings alone, best = bge-m3 (also: e5, mpnet, FastText trained here) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
 | 4 | *Comparison:* image embeddings alone, best = Marqo e-commerce CLIP (also: SigLIP 2, DINOv2, SigLIP, CLIP, Swin V2) | 0.941 | 0.708 | 257 ms to embed the photo on CPU |
-| 5 | Fusion (RRF → learned) | — | — | — |
+| 5 | Fusion of BM25 + bge-m3 + Marqo (RRF → learned weights) + at-least-one-match + neighbour voting | 0.978 | **0.793** | 90 ms search + ~530 ms to embed a new query on CPU |
 | 6 | + Reranker on top N | — | — | — |
 | 7 | Fine-tuned embeddings with hard negatives | — | — | — |
 | 8 | Per-cluster / adaptive thresholds | — | — | — |
@@ -127,7 +127,7 @@ docs/
 ## Status
 
 Rungs 1–3 are done. Best so far: F1 0.744 (rung 2). Rung 3 showed text embeddings alone score below BM25, but find different matches: together they get 18% more correct matches than either alone. Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Rung 4 (image embeddings) is done: a product-specific model (Marqo) beat five general ones. Next: rung 5 (fusion).
+[docs/ladder.md](docs/ladder.md). Rungs 1–5 are done: **F1 0.793** on validation (from 0.469 with no model). Next: rung 6 (reranker).
 
 ## Licence and data
 

@@ -227,3 +227,22 @@ def test_vector_stores_agree_with_exact_search(tmp_path):
     reused = build_store({"type": "faiss", "index": "flat", "path": str(tmp_path / "t.faiss")})
     reused.build(corpus)
     assert (reused.search(queries, 5)[0] == ref_idx).all()
+
+
+def test_min_matches_always_keeps_the_top_candidate(toy):
+    cands, labels = toy
+    # Above every score, normally each listing predicts only itself; with min_matches=1 it also takes its
+    # top candidate. Row 1's top candidate (0) is a true match: tp=2, |P|=2, |T|=3 -> 0.8.
+    f1 = metrics.f1_per_listing(cands, labels, 2.0, min_matches=1)
+    assert f1[1] == pytest.approx(0.8)
+    assert f1[0] == pytest.approx(2 * 1 / (2 + 3))  # row 0's top candidate (3) is wrong: tp=1, |P|=2
+
+
+def test_rrf_fusion_rewards_agreement():
+    from matchlens.retrievers import build_retriever
+    corpus = pd.DataFrame({"title": ["kaos polos hitam", "kaos polos putih", "sepatu lari hitam"]})
+    r = build_retriever({"type": "fusion", "method": "rrf", "members": [{"type": "bm25"}, {"type": "bm25", "k1": 2.0}]})
+    r.fit(corpus)
+    res = r.search(corpus.iloc[[0]], 3)
+    assert res.indices[0, 0] == 0 and res.scores[0, 0] == pytest.approx(1.0)  # first for both members
+    assert (np.diff(res.scores[0][res.indices[0] >= 0]) <= 0).all()

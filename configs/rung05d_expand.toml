@@ -1,0 +1,56 @@
+name = "rung05d_expand"
+rung = "5d"
+description = "Rung 5c + neighbour voting (query expansion + database augmentation) on both embedding members"
+
+[data]
+csv = "C:/data/shopee/train.csv"  # kept outside OneDrive; change to wherever you downloaded it
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "phash_boost"   # rung 2's photo-fingerprint rule stays on top
+max_dist = 6
+
+[retriever.base]
+type = "fusion"
+method = "learned"
+# Retrained for the expanded members: python -m matchlens.fusion_train configs/rung05d_expand.toml
+model_path = "results/fusion/rung05d_logreg.json"
+
+[[retriever.base.members]]
+type = "bm25"
+k1 = 1.2
+b = 0.75
+canonical_units = true
+
+[[retriever.base.members]]
+type = "dense"   # text: bge-m3 (rung 3 winner)
+path = "C:/data/shopee/embeddings/emb_bge_m3.npz"
+expand_k = 3        # neighbour voting: blend with the 3 nearest (incl. itself)
+expand_alpha = 3.0  # weight = similarity^3, so close neighbours count most
+
+[retriever.base.members.store]
+type = "faiss"
+index = "flat"
+path = "C:/data/shopee/stores/faiss_text_bge_m3_expanded.index"
+
+[[retriever.base.members]]
+type = "dense"   # images: Marqo e-commerce B (rung 4 winner)
+path = "C:/data/shopee/embeddings/emb_img_marqo_ecom_b.npz"
+expand_k = 3        # neighbour voting: blend with the 3 nearest (incl. itself)
+expand_alpha = 3.0  # weight = similarity^3, so close neighbours count most
+
+[retriever.base.members.store]
+type = "faiss"   # same results as Qdrant (docs/architecture.md); FAISS keeps evaluation fast
+index = "flat"
+path = "C:/data/shopee/stores/faiss_img_marqo_ecom_b_expanded.index"
+
+[eval]
+k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
+latency_sample = 200
+# Every Shopee product has at least two listings, so always predict the best candidate.
+min_matches = 1
+
+[cost]
+usd_per_hour = 0.10

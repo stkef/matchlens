@@ -70,6 +70,7 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
     name = cfg["name"]
     eval_cfg = {"k": 50, "latency_sample": 200, **cfg.get("eval", {})}
     k = int(eval_cfg["k"])
+    min_matches = int(eval_cfg.get("min_matches", 0))
     usd_per_hour = float(cfg.get("cost", {}).get("usd_per_hour", 0.10))
 
     distractors = list(eval_cfg.get("distractors", []))
@@ -90,7 +91,7 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
 
     runs_dir = results_dir / "runs"
     if split == "val":
-        tuned = tune_threshold(cands, labels)
+        tuned = tune_threshold(cands, labels, min_matches=min_matches)
         threshold = tuned.threshold
         curve = {"thresholds": tuned.grid.tolist(), "mean_f1": tuned.f1_by_threshold.round(5).tolist()}
     else:
@@ -107,7 +108,7 @@ def run(cfg: dict, split: str, results_dir: Path, unlock_test: bool = False) -> 
         "recall@10": metrics.recall_at_k(cands, labels, 10),
         "recall@50": metrics.recall_at_k(cands, labels, 50) if k >= 50 else float("nan"),
         "mrr": metrics.mrr(cands, labels),
-        "f1": float(metrics.f1_per_listing(cands, labels, threshold).mean()),
+        "f1": float(metrics.f1_per_listing(cands, labels, threshold, min_matches).mean()),
         "threshold": threshold,
         "precision@recall0.9": metrics.precision_at_recall(cands, labels, 0.9),
         "p50_ms": float(np.percentile(latency, 50) * 1000),
