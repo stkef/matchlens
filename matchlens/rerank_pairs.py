@@ -6,12 +6,14 @@ For each query listing, takes the top-N candidates of a finished pipeline (rung 
 so a cross-encoder can score each (query title, candidate title) pair on a Kaggle GPU.
 
 - val:   every val listing, searched against the usual val + train pool (what rung 6 is scored on).
-- train: a random sample of train listings, searched against the train listings only, used to train
-         the judge that combines the pipeline score with the reranker score. Val is never used for that.
+- train: train listings (a random sample, or all with --train-queries 0), searched against the train
+         listings only. Each query gets a random `fold` (A or B): rung 7b fine-tunes a cross-encoder on
+         fold A and fits the judge on fold B, so the judge never sees scores on pairs the reranker
+         trained on. Val is never used for either.
 
 Writes to --out-dir:
-    pairs_<split>.csv           query, candidate, base_score, same (label; kept locally)
-    upload/pairs_<split>.csv    query, candidate only — the file uploaded to Kaggle
+    pairs_<split>.csv           query, candidate, base_score, same (label; kept locally), fold (train)
+    upload/pairs_<split>.csv    query, candidate (+ fold for train) — the file uploaded to Kaggle
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("config")
     p.add_argument("--n", type=int, default=20)
-    p.add_argument("--train-queries", type=int, default=6000)
+    p.add_argument("--train-queries", type=int, default=6000, help="0 = all train listings")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out-dir", default="C:/data/shopee/rerank")
     args = p.parse_args(argv)
@@ -56,7 +58,8 @@ def main(argv=None) -> None:
         "val": (val, pd.concat([val, train], ignore_index=True)),
         "train": (None, None),
     }
-    sample = train.sample(n=min(args.train_queries, len(train)), random_state=args.seed)
+    n_train = len(train) if args.train_queries == 0 else min(args.train_queries, len(train))
+    sample = train.sample(n=n_train, random_state=args.seed)
     rest = train.drop(sample.index)
     jobs["train"] = (sample.reset_index(drop=True), pd.concat([sample, rest], ignore_index=True))
 
@@ -66,8 +69,16 @@ def main(argv=None) -> None:
         true_others = sum(int((labels == labels[i]).sum()) - 1 for i in range(len(queries)))
         print(f"{name}: {len(queries)} queries, {len(pairs)} pairs, "
               f"{pairs['same'].sum()} true ({pairs['same'].sum() / true_others:.1%} of all true pairs within top {args.n})")
+        cols = ["query", "candidate"]
+        if name == "train":
+            # Folds by product, not by listing, so no product has listings in both folds.
+            groups = queries["label_group"].unique()
+            in_a = set(groups[np.random.default_rng(args.seed).random(len(groups)) < 0.5])
+            folds = pd.Series(np.where(queries["label_group"].isin(in_a), "A", "B"), index=queries["posting_id"])
+            pairs["fold"] = folds[pairs["query"]].to_numpy()
+            cols.append("fold")
         pairs.to_csv(out / f"pairs_{name}.csv", index=False)
-        pairs[["query", "candidate"]].to_csv(out / "upload" / f"pairs_{name}.csv", index=False)
+        pairs[cols].to_csv(out / "upload" / f"pairs_{name}.csv", index=False)
 
 
 if __name__ == "__main__":

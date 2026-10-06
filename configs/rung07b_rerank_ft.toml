@@ -1,0 +1,65 @@
+name = "rung07b_rerank_ft"
+rung = "7b"
+description = "Rung 7a + top-20 reranked by our fine-tuned MiniLM cross-encoder (judge on fold B)"
+
+[data]
+csv = "C:/data/shopee/train.csv"  # kept outside OneDrive; change to wherever you downloaded it
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "rerank"
+top_n = 20
+# Scores from kaggle/finetune_rerank for rung 7a's top-20 val candidates (matchlens.rerank_pairs).
+scores = ["C:/data/shopee/rerank7b/rerank_minilm_ft_val.csv"]
+# Fitted on fold-B train pairs only (the reranker trained on fold A):
+# python -m matchlens.rerank_judge configs/rung07b_rerank_ft.toml --pairs C:/data/shopee/rerank7b/pairs_train.csv --train-scores C:/data/shopee/rerank7b/rerank_minilm_ft_train.csv
+judge_path = "results/rerank/rung07b_minilm_ft_judge.json"
+
+[retriever.base]
+type = "phash_boost"   # rung 2's photo-fingerprint rule stays on top
+max_dist = 6
+
+[retriever.base.base]
+type = "fusion"
+method = "learned"
+# Retrained for the new text member: python -m matchlens.fusion_train configs/rung07a_fusion.toml
+model_path = "results/fusion/rung07a_logreg.json"
+
+[[retriever.base.base.members]]
+type = "bm25"
+k1 = 1.2
+b = 0.75
+canonical_units = true
+
+[[retriever.base.base.members]]
+type = "dense"   # text: e5-base fine-tuned with labels + hard negatives (rung 7a)
+path = "C:/data/shopee/embeddings/emb_e5ft_supervised.npz"
+expand_k = 3        # neighbour voting: blend with the 3 nearest (incl. itself)
+expand_alpha = 3.0  # weight = similarity^3, so close neighbours count most
+
+[retriever.base.base.members.store]
+type = "faiss"
+index = "flat"
+path = "C:/data/shopee/stores/faiss_text_e5ft_supervised_expanded.index"
+
+[[retriever.base.base.members]]
+type = "dense"   # images: Marqo e-commerce B (rung 4 winner)
+path = "C:/data/shopee/embeddings/emb_img_marqo_ecom_b.npz"
+expand_k = 3        # neighbour voting: blend with the 3 nearest (incl. itself)
+expand_alpha = 3.0  # weight = similarity^3, so close neighbours count most
+
+[retriever.base.base.members.store]
+type = "faiss"   # same results as Qdrant (docs/architecture.md); FAISS keeps evaluation fast
+index = "flat"
+path = "C:/data/shopee/stores/faiss_img_marqo_ecom_b_expanded.index"
+
+[eval]
+k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
+latency_sample = 200
+# Every Shopee product has at least two listings, so always predict the best candidate.
+min_matches = 1
+
+[cost]
+usd_per_hour = 0.10

@@ -290,8 +290,22 @@ validation improves.
   2. **Supervised contrastive with hard negatives:** uses `label_group` to pull true matches together
      and push the system's own look-alike mistakes apart.
   Both start from multilingual-e5-base, train on Kaggle, and are scored the same way (results above).
-- **Pending:** 7b — fine-tune a small cross-encoder on our own pairs (rung 6 showed off-the-shelf ones
-  are slow or don't help); 7c — fine-tune the image model.
+- **Rung 7b — fine-tuned small reranker (done):**
+  - Base: `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` (118M), which gave **no gain** untrained in rung 6.
+  - Pairs: `python -m matchlens.rerank_pairs configs/rung07a_fusion.toml --train-queries 0` exported
+    rung 7a's top 20 for every train listing (481,300 pairs) and every val listing (67,320). Train
+    listings were split **by product** into fold A (242,540 pairs, 12,127 listings) and fold B
+    (238,760 pairs, 11,938 listings); no product is in both.
+  - [`kaggle/finetune_rerank`](../kaggle/finetune_rerank) fine-tuned it on **fold A only** (binary
+    cross-entropy, "same product?", 1 epoch, batch 64, lr 2e-5; 8 min on Kaggle's GPU), then scored fold B
+    and val. The judge was fitted on **fold B** (`rerank_judge`), so it never sees reranker scores on
+    pairs the reranker trained on — the cross-fitting fix for the 7a caveat.
+  - **Result (val):** MRR 0.889, **F1 0.811** vs 0.804 for 7a. Paired bootstrap: 609 better, 542 worse,
+    mean +0.0069, 95% [+0.0027, +0.0108], positive in 100%. Judge weights: base +4.12, cross-encoder
+    +0.40 (vs +0.15 for the same model untrained).
+  - **Cheaper and better than rung 6:** beats the 568M off-the-shelf reranker (0.805) at about a tenth of
+    the CPU cost (~0.3 s vs 3.3 s per listing for 20 pairs, same architecture as measured in rung 6).
+- **Pending:** 7c — fine-tune the image model.
 
 ## Rung 8 — Per-cluster / adaptive thresholds
 

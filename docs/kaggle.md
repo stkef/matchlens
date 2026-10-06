@@ -50,6 +50,13 @@ named `HF_TOKEN` and attached to the notebook. To re-run selected models only, s
 3. `kaggle kernels push -p kaggle/finetune_text`; fetch `emb_e5ft_*.npz` with `kaggle kernels output`.
    The notebook reads the split file from this repo on GitHub, so it trains on exactly the train split.
 
+## Rung 7b: fine-tuning the reranker
+
+1. `python -m matchlens.rerank_pairs configs/rung07a_fusion.toml --train-queries 0 --out-dir C:/data/shopee/rerank7b`
+2. From inside `C:/data/shopee/rerank7b`: `kaggle datasets create -p upload` (private `matchlens-rerank-pairs-7b`).
+3. `kaggle kernels push -p kaggle/finetune_rerank`; fetch `rerank_minilm_ft_*.csv` with `kaggle kernels output`.
+4. `python -m matchlens.rerank_judge configs/rung07b_rerank_ft.toml --pairs C:/data/shopee/rerank7b/pairs_train.csv --train-scores C:/data/shopee/rerank7b/rerank_minilm_ft_train.csv`
+
 ## Why not local Ollama?
 
 Tried first. Ollama runs the same open models, but on this laptop it computes on the CPU: bge-m3

@@ -1,0 +1,13 @@
+{
+  "id": "pradeep129009090/matchlens-finetune-rerank",
+  "title": "matchlens-finetune-rerank",
+  "code_file": "finetune_rerank.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["pradeep129009090/matchlens-rerank-pairs-7b"],
+  "competition_sources": ["shopee-product-matching"],
+  "kernel_sources": []
+}
