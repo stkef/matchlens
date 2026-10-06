@@ -1,0 +1,13 @@
+{
+  "features": [
+    "base_score",
+    "cross_encoder_logit"
+  ],
+  "coef": [
+    4.305883809033817,
+    0.14701429642904743
+  ],
+  "intercept": -2.7749333088192123,
+  "n_pairs": 120000,
+  "n_positive": 23311
+}

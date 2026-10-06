@@ -3,12 +3,14 @@ from matchlens.retrievers.bm25 import BM25Retriever
 from matchlens.retrievers.dense import PrecomputedEmbeddingRetriever
 from matchlens.retrievers.fusion import FusionRetriever
 from matchlens.retrievers.phash import PhashBoostRetriever
+from matchlens.retrievers.rerank import RerankRetriever
 
 REGISTRY = {
     "bm25": BM25Retriever,
     "phash_boost": PhashBoostRetriever,
     "dense": PrecomputedEmbeddingRetriever,
     "fusion": FusionRetriever,
+    "rerank": RerankRetriever,
 }
 
 
@@ -30,4 +32,4 @@ def build_retriever(cfg: dict) -> Retriever:
 
 
 __all__ = ["Candidates", "Retriever", "drop_self", "build_retriever", "BM25Retriever", "PhashBoostRetriever",
-           "PrecomputedEmbeddingRetriever", "FusionRetriever"]
+           "PrecomputedEmbeddingRetriever", "FusionRetriever", "RerankRetriever"]

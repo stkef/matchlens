@@ -34,6 +34,15 @@ Notebook source: [`kaggle/embed_images/`](../kaggle/embed_images). Same flow as 
 `.json` and skipped. Gated models (DINOv3) need a Hugging Face read token stored as a Kaggle secret
 named `HF_TOKEN` and attached to the notebook. To re-run selected models only, set `RUN_ONLY`.
 
+## Rung 6: reranker pair scores
+
+1. `python -m matchlens.rerank_pairs configs/rung05d_expand.toml` writes the candidate pairs to
+   `C:/data/shopee/rerank` (with labels, kept locally) and `.../rerank/upload` (ids only).
+2. Upload the ids as a private dataset (run from inside `C:/data/shopee/rerank`; the Kaggle CLI mangles
+   absolute Windows paths): `kaggle datasets create -p upload`.
+3. `kaggle kernels push -p kaggle/rerank`, then `kaggle kernels output <username>/matchlens-rerank -p .`
+4. `python -m matchlens.rerank_judge configs/rung06_bge_v2_m3.toml --train-scores C:/data/shopee/rerank/rerank_bge_v2_m3_train.csv`
+
 ## Why not local Ollama?
 
 Tried first. Ollama runs the same open models, but on this laptop it computes on the CPU: bge-m3

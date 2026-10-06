@@ -1,0 +1,13 @@
+{
+  "id": "pradeep129009090/matchlens-rerank",
+  "title": "matchlens-rerank",
+  "code_file": "rerank.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["pradeep129009090/matchlens-rerank-pairs"],
+  "competition_sources": ["shopee-product-matching"],
+  "kernel_sources": []
+}

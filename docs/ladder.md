@@ -212,12 +212,42 @@ validation improves.
   98.8% of resamples: small but real, for 3× the search time (still well under budget).
 - **Verdict:** kept, all four steps. **F1 0.744 → 0.793 (+0.049)**, the second-largest gain after rung 2.
 
-## Rung 6 — Reranker
+## Rung 6 — Cross-encoder reranker
 
-- **Kind:** additive
-- **Hypothesis:** A cross-encoder reading both titles together, plus image similarity, fixes near-misses
-  ranked above true matches.
-- **Result / verdict:** _pending_ (report p95 with and without it)
+- **Kind:** additive (two rerankers compared)
+- **Configs:** `configs/rung06_<model>.toml`; pair scores computed on a Kaggle GPU by
+  [`kaggle/rerank`](../kaggle/rerank).
+- **Hypothesis:** embeddings encode each title separately and blur details; a cross-encoder reads the
+  query and candidate titles *together* (attention across both), so it should separate look-alikes
+  ("800 ml" vs "400 ml") that rung 5 ranks too high.
+- **How it was run:**
+  1. `python -m matchlens.rerank_pairs configs/rung05d_expand.toml` exported rung 5d's top 20 per
+     listing: 67,320 val pairs (89.5% of all true val pairs fall within the top 20 — the ceiling for
+     this rung) and 120,000 pairs from 6,000 sampled train listings (searched among train listings only).
+  2. The pair ids (no titles or images) went to a private Kaggle dataset; the notebook scored every pair
+     with each cross-encoder.
+  3. `python -m matchlens.rerank_judge` fitted a logistic regression on **train pairs only**:
+     P(same) from [rung 5d score, cross-encoder logit]. Photos still count through the rung 5d score.
+- **Result (val, pool 27,431):**
+
+  | Reranker | Size | Recall@10 | MRR | F1 | Δ F1 vs 5d | Bootstrap: share of resamples > 0 | CPU per listing (20 pairs) | GPU, 67k pairs |
+  |---|---|---|---|---|---|---|---|---|
+  | none (rung 5d) | — | — | 0.877 | 0.793 | | | — | — |
+  | **BAAI/bge-reranker-v2-m3** | 568M | 0.929 | **0.890** | **0.805** | **+0.011** [95%: +0.007, +0.015] | **100%** | 3.3 s | 180 s |
+  | cross-encoder/mmarco-mMiniLMv2-L12 | 118M | 0.929 | 0.887 | 0.792 | −0.001 [−0.005, +0.003] | 26% | 0.30 s | 30 s |
+
+  Judge weights (base score / cross-encoder logit): bge +3.86 / +0.27, MiniLM +4.31 / +0.15.
+- **What bge changed** (accepted pairs at each pipeline's threshold, val): removed 1,207 wrong matches
+  and added 383 true ones, at the cost of 367 new wrong matches and 902 lost true ones — net positive.
+  Removed: "Johnson's Top to Toe Hair & Body Bath 500ml" vs "Johnson's Baby Bath Milk & Rice 500ml";
+  added: "ALAT PIJIT KEPALA MERK BOKOMA" vs "Alat Pijat Kepala Relaxsasi BOKOMA Head Massager".
+  Some "removed" pairs look like label noise (two "Perlak Bayi Sugar Baby" listings labelled different).
+- **Verdict:** **bge-reranker-v2-m3 kept: F1 0.793 → 0.805.** MiniLM gives no measurable gain, so the
+  cheap option is not an option here (it is 0.013 below, outside the 0.01 rule).
+- **Cost — the honest catch:** bge needs **3.3 s per listing on CPU**, ten times the 300 ms budget; it is
+  only practical on a GPU (180 s for 67k pairs ≈ 50 ms per listing). Both rerankers were trained for
+  search relevance, not product identity, which limits how well they separate variants. A small
+  cross-encoder *fine-tuned on our own pairs* (rung 7) is the route to both cheaper and better.
 
 ## Rung 7 — Fine-tuned embeddings with hard negatives
 
