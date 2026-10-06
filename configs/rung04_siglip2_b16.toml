@@ -1,0 +1,28 @@
+name = "rung04_siglip2_b16"
+rung = 4
+description = "Comparison: image embeddings alone, google/siglip2-base-patch16-224"
+
+[data]
+csv = "C:/data/shopee/train.csv"  # kept outside OneDrive; change to wherever you downloaded it
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "dense"
+# Computed on Kaggle's GPU by kaggle/embed_images; see docs/kaggle.md.
+path = "C:/data/shopee/embeddings/emb_img_siglip2_b16.npz"
+
+[retriever.store]
+# Models are compared in FAISS (exact, fast; identical results to Qdrant, see docs/architecture.md).
+# The winning image model is then served from Qdrant: configs/rung04_image_qdrant.toml.
+type = "faiss"
+index = "flat"
+path = "C:/data/shopee/stores/faiss_img_siglip2_b16.index"
+
+[eval]
+k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
+latency_sample = 200
+
+[cost]
+usd_per_hour = 0.10

@@ -146,25 +146,33 @@ validation improves.
 
   | Model | Learned from | Dim | Recall@50 | MRR | F1 | Threshold | Embed 1 photo (CPU p50) | GPU time, 34k photos |
   |---|---|---|---|---|---|---|---|---|
-  | facebook/dinov2-base | images only (self-supervised) | 768 | 0.868 | 0.784 | **0.682** | 0.84 | 311 ms | 141 s |
-  | **google/siglip-base-patch16-224** | images + captions | 768 | **0.923** | **0.817** | 0.676 | 0.84 | **273 ms** | 158 s |
+  | **Marqo/marqo-ecommerce-embeddings-B** | **e-commerce product images + text** | 768 | **0.941** | **0.824** | **0.708** | 0.76 | **257 ms** | 235 s |
+  | google/siglip2-base-patch16-224 | images + captions | 768 | 0.935 | 0.818 | 0.682 | 0.87 | 284 ms | 502 s |
+  | facebook/dinov2-base | images only (self-supervised) | 768 | 0.868 | 0.784 | 0.682 | 0.84 | 311 ms | 141 s |
+  | google/siglip-base-patch16-224 | images + captions | 768 | 0.923 | 0.817 | 0.676 | 0.84 | 273 ms | 158 s |
   | microsoft/swinv2-base (ImageNet) | labelled categories | 1024 | 0.778 | 0.704 | 0.634 | 0.91 | 375 ms | 250 s |
   | openai/clip-vit-base-patch32 | images + captions | 512 | 0.755 | 0.683 | 0.634 | 0.88 | 109 ms | 409 s* |
   | facebook/dinov3-vitb16 | images only | — | — | — | — | — | — | not run: gated model, no HF token at run time |
   | jinaai/jina-embeddings-v4 | images + text | — | — | — | — | — | — | failed: `KeyError: 'default'` in its remote code |
 
   \* CLIP ran first, so its time includes Kaggle's first cold read of the 34k photos from disk.
-- **Verdict:** **SigLIP** is carried forward: within 0.006 F1 of DINOv2, 12% cheaper per photo, and
-  clearly better at *finding* candidates (recall@50 0.923 vs 0.868, MRR 0.817 vs 0.784), which is what
-  fusion (rung 5) needs.
+- **Verdict:** **Marqo e-commerce B** is carried forward. It is the best on every accuracy metric
+  (F1 0.708, +0.026 over the next best) *and* the cheapest per photo of the strong models (257 ms), so
+  the "cheapest within 0.01 F1" rule picks it outright.
+  - *Second run (2026-10-06):* SigLIP was first selected from the initial four; SigLIP 2 and Marqo were
+    then added as token-free alternatives to DINOv3. SigLIP 2 improved on SigLIP (+0.005 F1), but the
+    domain-specific Marqo model beat every general-purpose one.
+  - *Domain beats generality:* Marqo is a CLIP-style model trained on online-shop product images and
+    titles — the same kind of data as Shopee — and it outperforms models trained on general web photos
+    of the same size.
 - **Observations:**
   - The best image model alone (0.682) is roughly level with BM25 + units (0.682) and bge-m3 (0.673):
     three very different signals of similar strength — promising for fusion.
   - Swin V2, trained to name *categories*, is weakest at recognising *the same item*, as expected.
   - CLIP B/32 is the cheapest per photo (109 ms) but 0.05 F1 behind: outside the 0.01 rule.
-- **Pending:** DINOv3 (needs Hugging Face licence + `HF_TOKEN` Kaggle secret; re-run with
-  `RUN_ONLY = ["dinov3_b"]`), Jina v4 (library version mismatch to debug). The winner is then loaded
-  into Qdrant, the image vector store.
+- **Not run:** DINOv3 (gated; replaced by the token-free SigLIP 2 / Marqo comparison), Jina v4
+  (`KeyError: 'default'` in its remote code). The winner is then loaded into Qdrant, the image vector
+  store.
 
 ## Rung 5 — Fusion
 

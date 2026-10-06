@@ -55,6 +55,8 @@ def embed(model, pixels):
     """One batch -> vectors, on whatever device/dtype the model currently has."""
     p = next(model.parameters())
     pixels = pixels.to(p.device, p.dtype)
+    if hasattr(model, "encode_image"):                # open_clip models (Marqo e-commerce)
+        return model.encode_image(pixels)
     if hasattr(model, "get_image_features"):          # CLIP / SigLIP: projected image embedding
         out = model.get_image_features(pixel_values=pixels)
         return out if torch.is_tensor(out) else out.pooler_output  # newer transformers wrap it
@@ -77,6 +79,27 @@ def clip_like(model_id):
     return processor, AutoModel.from_pretrained(model_id, torch_dtype=torch.float16)
 
 
+class OpenClipProcessor:
+    """Gives an open_clip transform the same call shape as a transformers image processor."""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self, images, return_tensors="pt"):
+        return {"pixel_values": self.transform(images).unsqueeze(0)}
+
+
+def open_clip_model(hub_id):
+    """open_clip models from the Hugging Face hub, e.g. Marqo's e-commerce CLIP."""
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "open_clip_torch"], check=True)
+    import open_clip
+
+    model, _, preprocess = open_clip.create_model_and_transforms(f"hf-hub:{hub_id}")
+    return OpenClipProcessor(preprocess), model.half()
+
+
 MODELS = [
     # name,        loader,                                                           batch
     ("clip_b32",   lambda: clip_like("openai/clip-vit-base-patch32"),                 256),
@@ -84,6 +107,8 @@ MODELS = [
     ("dinov2_b",   lambda: hf_backbone("facebook/dinov2-base"),                      128),
     ("swinv2_b",   lambda: hf_backbone("microsoft/swinv2-base-patch4-window8-256"),  128),
     ("dinov3_b",   lambda: hf_backbone("facebook/dinov3-vitb16-pretrain-lvd1689m"),  128),
+    ("siglip2_b16", lambda: clip_like("google/siglip2-base-patch16-224"),            256),
+    ("marqo_ecom_b", lambda: open_clip_model("Marqo/marqo-ecommerce-embeddings-B"),  256),
 ]
 
 
