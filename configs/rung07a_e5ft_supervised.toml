@@ -1,0 +1,27 @@
+name = "rung07a_e5ft_supervised"
+rung = "7a"
+description = "e5-base fine-tuned on the train split (supervised), text embeddings alone"
+
+[data]
+csv = "C:/data/shopee/train.csv"  # kept outside OneDrive; change to wherever you downloaded it
+split = "data/splits/split_v1.csv"
+
+[retriever]
+type = "dense"
+# Trained and embedded on Kaggle's GPU by kaggle/finetune_text; see docs/kaggle.md.
+path = "C:/data/shopee/embeddings/emb_e5ft_supervised.npz"
+
+[retriever.store]
+# Text vectors live in FAISS (exact flat index; saved to disk and reused). Images use Qdrant (rung 4).
+type = "faiss"
+index = "flat"
+path = "C:/data/shopee/stores/faiss_text_e5ft_supervised.index"
+
+[eval]
+k = 50
+# Other products added to the candidate pool (retrievable, never queried). See docs/evaluation.md.
+distractors = ["train"]
+latency_sample = 200
+
+[cost]
+usd_per_hour = 0.10

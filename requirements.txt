@@ -1,6 +1,6 @@
 # Pinned for reproducibility (Python 3.12). Transformer models run on Kaggle (kaggle/), not locally.
 numpy==2.5.3
-pandas==3.0.6
+pandas==2.2.3      # not 3.x: Windows Smart App Control blocked a pandas 3.0.6 DLL on the dev laptop
 scipy==1.18.1
 pytest==9.1.1
 gensim==4.4.0      # FastText (rung 3)

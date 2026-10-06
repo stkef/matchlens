@@ -254,14 +254,44 @@ validation improves.
 - **Kind:** additive, with an internal comparison
 - **Hypothesis:** Training on the system's own mistakes (from the **train** split) teaches the encoders
   that 64 GB ≠ 128 GB.
+- **Rung 7a — text model (done):**
+  - Base: `intfloat/multilingual-e5-base` (278M; 3.5× faster per query than bge-m3), fine-tuned on
+    Kaggle by [`kaggle/finetune_text`](../kaggle/finetune_text) with MultipleNegativesRankingLoss
+    (batch 64, lr 2e-5, max 64 tokens), on the **24,065 train listings only**.
+  - Hard negatives: `python -m matchlens.mine_negatives configs/rung05d_expand.toml` searched every train
+    listing among train listings with rung 5d and kept its top-ranked *wrong* candidates: 115,991, about
+    5 per listing (e.g. "Sunlight … Refill Habbatussauda 755 ml" vs "Sunlight … Refill Jeruk Nipis 755ml").
+  - Result, text model alone (val):
+
+    | Model | Training | F1 (pool 27,431) | Recall@50 | MRR | F1 without distractors (pool 3,366) |
+    |---|---|---|---|---|---|
+    | e5-base | none | 0.644 | 0.855 | 0.729 | 0.757 |
+    | bge-m3 (rung 3 pick) | none | 0.673 | 0.900 | 0.774 | 0.812 |
+    | e5-base + SimCSE | raw train titles, 1 epoch, 5 min | 0.655 | 0.868 | 0.748 | 0.787 |
+    | **e5-base + labels + hard negatives** | (anchor, same product, look-alike), 2 epochs, 15 min | **0.703** | **0.938** | **0.798** | **0.848** |
+
+  - **Labels are worth ~5× more than self-supervision here:** SimCSE +0.011 over the base model,
+    supervised +0.060. The supervised small model beats the 2× larger bge-m3 by +0.030.
+  - **Not memorisation:** the training listings are also the distractors, so the model was re-scored
+    without them (last column); the gain over bge-m3 holds (+0.036).
+  - **In the full pipeline** (`configs/rung07a_fusion.toml`: rung 5d with the text member swapped,
+    fusion weights retrained): recall@50 **0.986** (best so far), MRR 0.879, **F1 0.804** vs 0.793 for
+    rung 5d. Paired bootstrap: 612 listings better, 424 worse, mean +0.0105, 95% [+0.0071, +0.0140],
+    positive in 100%. This equals rung 6 (0.805) **without** the 3.3 s/listing cross-encoder.
+  - **Caveat:** the fusion weights are fitted on train pairs, which the fine-tuned model has seen, so the
+    judge sees an over-optimistic text score (its weight rose from +1.9 to +4.7). Val still improved; the
+    clean fix is cross-fitting (fine-tune on one half of train, fit the judge on the other).
+  - Rung 6's reranker scores were computed for rung 5d's candidates, so stacking it on 7a needs a new
+    Kaggle scoring run (not done).
 - **Comparison inside the rung — what are the labels worth?**
   1. **SimCSE (self-supervised, no labels):** the same title passed through the model twice with
      different dropout should land close; other titles in the batch should land far. Uses only raw
      train titles.
   2. **Supervised contrastive with hard negatives:** uses `label_group` to pull true matches together
      and push the system's own look-alike mistakes apart.
-  Both start from the best rung 3 model, train on Kaggle, and are scored the same way.
-- **Result / verdict:** _pending_
+  Both start from multilingual-e5-base, train on Kaggle, and are scored the same way (results above).
+- **Pending:** 7b — fine-tune a small cross-encoder on our own pairs (rung 6 showed off-the-shelf ones
+  are slow or don't help); 7c — fine-tune the image model.
 
 ## Rung 8 — Per-cluster / adaptive thresholds
 

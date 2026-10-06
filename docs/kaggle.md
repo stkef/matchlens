@@ -43,6 +43,13 @@ named `HF_TOKEN` and attached to the notebook. To re-run selected models only, s
 3. `kaggle kernels push -p kaggle/rerank`, then `kaggle kernels output <username>/matchlens-rerank -p .`
 4. `python -m matchlens.rerank_judge configs/rung06_bge_v2_m3.toml --train-scores C:/data/shopee/rerank/rerank_bge_v2_m3_train.csv`
 
+## Rung 7a: fine-tuning the text model
+
+1. `python -m matchlens.mine_negatives configs/rung05d_expand.toml` → `C:/data/shopee/mining/upload/hard_negatives.csv`
+2. From inside `C:/data/shopee/mining`: `kaggle datasets create -p upload` (private dataset `matchlens-train-mining`).
+3. `kaggle kernels push -p kaggle/finetune_text`; fetch `emb_e5ft_*.npz` with `kaggle kernels output`.
+   The notebook reads the split file from this repo on GitHub, so it trains on exactly the train split.
+
 ## Why not local Ollama?
 
 Tried first. Ollama runs the same open models, but on this laptop it computes on the CPU: bge-m3
