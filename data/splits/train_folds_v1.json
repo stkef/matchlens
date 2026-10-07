@@ -1,0 +1,11 @@
+{
+  "source": "matchlens.rerank_pairs (rung 7b), product-level random split, seed 0",
+  "listings": {
+    "A": 12127,
+    "B": 11938
+  },
+  "products": {
+    "A": 3867,
+    "B": 3843
+  }
+}
