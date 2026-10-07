@@ -57,6 +57,14 @@ named `HF_TOKEN` and attached to the notebook. To re-run selected models only, s
 3. `kaggle kernels push -p kaggle/finetune_rerank`; fetch `rerank_minilm_ft_*.csv` with `kaggle kernels output`.
 4. `python -m matchlens.rerank_judge configs/rung07b_rerank_ft.toml --pairs C:/data/shopee/rerank7b/pairs_train.csv --train-scores C:/data/shopee/rerank7b/rerank_minilm_ft_train.csv`
 
+## Rung 7c: fine-tuning the image model
+
+1. Folds: `data/splits/train_folds_v1.csv` (product-level A/B split of train, committed so the notebook
+   reads it from GitHub).
+2. `kaggle kernels push -p kaggle/finetune_image` (uses the `matchlens-train-mining` dataset for hard
+   negatives); fetch `emb_img_marqo_ft.npz` with `kaggle kernels output`.
+3. `python -m matchlens.fusion_train configs/rung07c_fusion.toml --fold B`, then evaluate.
+
 ## Why not local Ollama?
 
 Tried first. Ollama runs the same open models, but on this laptop it computes on the CPU: bge-m3

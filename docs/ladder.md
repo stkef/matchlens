@@ -305,7 +305,32 @@ validation improves.
     +0.40 (vs +0.15 for the same model untrained).
   - **Cheaper and better than rung 6:** beats the 568M off-the-shelf reranker (0.805) at about a tenth of
     the CPU cost (~0.3 s vs 3.3 s per listing for 20 pairs, same architecture as measured in rung 6).
-- **Pending:** 7c — fine-tune the image model.
+- **Rung 7c — fine-tuned image model (done):**
+  - Base: `Marqo/marqo-ecommerce-embeddings-B` (rung 4 winner). [`kaggle/finetune_image`](../kaggle/finetune_image)
+    trains the image tower only, on **fold-A products only** (12,127 listings,
+    `data/splits/train_folds_v1.csv`): for each anchor photo, a photo of another listing of the same
+    product is the positive; one hard negative (from `mine_negatives`, restricted to fold A) plus every
+    other photo in the batch are negatives (InfoNCE, temperature 0.05, batch 32 triplets, lr 1e-5,
+    2 epochs, open_clip training augmentations; 13 min on Kaggle's GPU).
+  - **Alone (val):** F1 0.708 → **0.754** (+0.046), recall@50 0.940 → 0.969, MRR 0.824 → 0.857.
+    Without train distractors: 0.824 → **0.878** (+0.054) — not memorisation, and learned from only half
+    the train products.
+  - **Fair comparison in the full pipeline:** both configs use the same members except the image model,
+    and both judges are fitted on **fold-B** products only (`fusion_train --fold B`), which the image
+    model never saw:
+
+    | Config | Image model | F1 | MRR | Recall@50 |
+    |---|---|---|---|---|
+    | `rung07a_fusion_foldB` (control) | Marqo, off the shelf | 0.805 | 0.879 | 0.987 |
+    | **`rung07c_fusion`** | **Marqo fine-tuned on fold A** | **0.819** | **0.893** | 0.980 |
+
+    Paired bootstrap: 664 listings better, 435 worse, mean **+0.0141**, 95% [+0.0101, +0.0183], positive
+    in 100%. The judge now leans on the photo model most (score weight +8.0, vs +5.4 untrained).
+  - **Best result so far, without any reranker** (7b's reranker was trained for 7a's candidates; stacking
+    it on 7c needs a new Kaggle run).
+- **Environment note:** Windows Smart App Control also blocked FAISS 1.15's DLL; faiss-cpu 1.9.0 is used
+  from 7c on. Re-running 7a with it gives F1 0.80381 instead of 0.80396 (near-tie reordering); every 7c
+  comparison above was run with the same FAISS version.
 
 ## Rung 8 — Per-cluster / adaptive thresholds
 

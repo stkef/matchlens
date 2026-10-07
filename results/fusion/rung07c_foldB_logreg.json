@@ -1,0 +1,21 @@
+{
+  "features": [
+    "bm25:score",
+    "bm25:inv_rank",
+    "dense_emb_e5ft_supervised:score",
+    "dense_emb_e5ft_supervised:inv_rank",
+    "dense_emb_img_marqo_ft:score",
+    "dense_emb_img_marqo_ft:inv_rank"
+  ],
+  "coef": [
+    2.289677732763335,
+    -0.610959772164966,
+    4.5301367709511,
+    -0.6115148233274431,
+    8.037399841519983,
+    0.6867385161434516
+  ],
+  "intercept": -11.065930107237453,
+  "n_pairs": 1330147,
+  "n_positive": 56313
+}

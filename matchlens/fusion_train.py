@@ -6,6 +6,9 @@ Uses the config's fusion members, searches every *train* listing against the tra
 a logistic regression that predicts "same product" from each member's score and 1/rank. Validation and
 test are never touched, so the threshold tuned on val afterwards stays honest. Writes the weights to the
 config's `model_path`.
+
+With --fold B, only the fold-B products of the train split are used (data/splits/train_folds_v1.csv):
+the cross-fitting setup when a member model was fine-tuned on fold A.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from scipy.optimize import minimize
 
 from matchlens.data import load_split_frame
@@ -50,6 +54,8 @@ def main(argv=None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("config")
     p.add_argument("--k", type=int, default=50)
+    p.add_argument("--fold", choices=["A", "B"], help="use only this fold of the train split")
+    p.add_argument("--folds-file", default="data/splits/train_folds_v1.csv")
     args = p.parse_args(argv)
     cfg = load_config(args.config)
     fusion_cfg = dict(find_fusion_cfg(cfg["retriever"]), method="rrf")  # rrf: no weights needed to collect features
@@ -57,6 +63,11 @@ def main(argv=None) -> None:
     fusion = build_retriever(fusion_cfg)
 
     train = load_split_frame(cfg["data"]["csv"], cfg["data"]["split"], "train")
+    if args.fold:
+        folds = pd.read_csv(args.folds_file)
+        keep = set(folds.loc[folds["fold"] == args.fold, "posting_id"])
+        train = train[train["posting_id"].isin(keep)].reset_index(drop=True)
+        print(f"fold {args.fold}: {len(train)} train listings")
     labels = train["label_group"].to_numpy()
     t0 = time.perf_counter()
     fusion.fit(train)

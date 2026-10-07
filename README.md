@@ -27,7 +27,8 @@ ladder is frozen. For scale: predicting "each listing matches only itself" alrea
 | 5 | Fusion of BM25 + bge-m3 + Marqo (RRF → learned weights) + at-least-one-match + neighbour voting | 0.978 | **0.793** | 90 ms search + ~530 ms to embed a new query on CPU |
 | 6 | + Cross-encoder reranker (bge-reranker-v2-m3) on the top 20 | — | **0.805** | 3.3 s per listing on CPU (GPU needed) |
 | 7a | Fine-tuned text model (e5-base + labels + hard negatives) swapped into rung 5 | 0.986 | 0.804 | 90 ms search + ~80 ms to embed a title on CPU (no reranker) |
-| 7b | + our fine-tuned small reranker (MiniLM, 118M) on the top 20 | — | **0.811** | + ~0.3 s per listing on CPU for 20 pairs |
+| 7b | + our fine-tuned small reranker (MiniLM, 118M) on the top 20 | — | 0.811 | + ~0.3 s per listing on CPU for 20 pairs |
+| 7c | Fine-tuned image model (Marqo, fold A) in the rung 7a pipeline, judge on fold B (no reranker) | 0.980 | **0.819** | 90 ms search + ~80 ms text + ~260 ms photo embedding on CPU |
 | 8 | Per-cluster / adaptive thresholds | — | — | — |
 
 "—" means not run yet. Every row regenerates from one command (see [Reproduce](#reproduce)).
@@ -128,7 +129,7 @@ docs/
 ## Status
 
 Rungs 1–3 are done. Best so far: F1 0.744 (rung 2). Rung 3 showed text embeddings alone score below BM25, but find different matches: together they get 18% more correct matches than either alone. Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Rungs 1–7b are done: **F1 0.811** on validation (from 0.469 with no model), using our own fine-tuned text model and reranker. Next: 7c (fine-tuned image model).
+[docs/ladder.md](docs/ladder.md). Rungs 1–7c are done: **F1 0.819** on validation (from 0.469 with no model), using our own fine-tuned text and image models. Next: stack the fine-tuned reranker on 7c, rung 8 (thresholds), then the one-time test run.
 
 ## Licence and data
 

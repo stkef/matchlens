@@ -1,0 +1,13 @@
+{
+  "id": "pradeep129009090/matchlens-finetune-image",
+  "title": "matchlens-finetune-image",
+  "code_file": "finetune_image.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["pradeep129009090/matchlens-train-mining"],
+  "competition_sources": ["shopee-product-matching"],
+  "kernel_sources": []
+}
