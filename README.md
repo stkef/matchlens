@@ -1,156 +1,111 @@
 # MatchLens
 
-**Is this the same product?** MatchLens decides whether two marketplace listings are the same product
-from their titles and photos — and backs every design choice with a measured experiment.
+**Finds the same product across marketplace listings, using titles and photos.**
 
-Marketplaces get the same product listed many times by different sellers, with messy titles, mixed
-languages and different photos. The hard part is look-alikes: the same phone in 64 GB and 128 GB reads
-and looks almost identical, but it is a different product.
+Sellers list the same product many times with messy, mixed-language titles and different photos. The
+hard cases are look-alikes: *"Sunlight dish soap, lime, 755 ml"* vs *"Sunlight dish soap, black seed,
+755 ml"* share almost every word and look alike, but are different products.
 
-The point of this project is not one final score. It is a **ladder**: start from a simple baseline, add
-one technique at a time, measure what each one gained or cost, and explain where the system still fails.
+MatchLens was built as an **experiment ladder**: start from a simple baseline, add one technique at a
+time, measure each change, and keep it only if it helps.
+
+**Result: F1 0.798 on a locked test split**, up from 0.677 for keyword search (BM25) and 0.463 for
+doing nothing.
+
+---
 
 ## Results
 
-**Final pipeline: F1 0.798 on the held-out test split** (0.821 on validation), from 0.463 for "each
-listing matches only itself". The ladder was frozen on validation, then the test split was unlocked
-once; every test number below reuses its validation threshold unchanged.
+Data: [Shopee – Price Match Guarantee](https://www.kaggle.com/competitions/shopee-product-matching)
+(34,250 listings, Indonesian/English), split **by product** into train / validation / test so no
+product appears in two splits. Every listing is searched against a crowded pool that includes all
+training listings, and F1 is the competition metric.
 
-Shopee – Price Match Guarantee, split by product. Validation: 3,366 query listings in a pool of 27,431
-(validation + all training listings as distractors). Test: 6,819 queries in a pool of 30,884.
+| Step | What was added | Val F1 | **Test F1** |
+|---|---|---|---|
+| 0 | Nothing (each listing matches only itself) | 0.469 | 0.463 |
+| 1 | BM25 keyword search on titles | 0.679 | 0.677 |
+| 2 | + perceptual photo hashes (copied photos) | 0.744 | 0.726 |
+| 5 | + fusion of BM25, text embeddings and image embeddings (learned weights) | 0.793 | 0.776 |
+| 7a | + text model fine-tuned on our data | 0.804 | 0.779 |
+| 7c | + image model fine-tuned on our data | 0.819 | 0.797 |
+| **8** | **+ adaptive cutoff → final pipeline** | **0.821** | **0.798** |
 
-| # | Rung | Val F1 | **Test F1** | Test R@50 | Query cost on CPU |
-|---|---|---|---|---|---|
-| 0 | No model (each listing matches only itself) | 0.469 | 0.463 | — | — |
-| 1 | BM25 on titles + global threshold | 0.679 | 0.677 | 0.911 | 1 ms |
-| 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.682 | 0.677 | 0.911 | 2 ms |
-| 2 | + near-duplicate photos (pHash ≤ 6 bits) | 0.744 | 0.726 | 0.930 | 2 ms |
-| 3 | *Comparison:* text embeddings alone — bge-m3 best of 5 (e5, mpnet, FastText trained here) | 0.673 | — | — | +274 ms to embed |
-| 4 | *Comparison:* image embeddings alone — Marqo e-commerce best of 6 (SigLIP 2, DINOv2, SigLIP, CLIP, Swin V2) | 0.708 | — | — | +257 ms to embed |
-| 5 | Fusion BM25 + bge-m3 + Marqo: learned weights, at-least-one-match, neighbour voting | 0.793 | 0.776 | 0.976 | 90 ms + ~530 ms to embed |
-| 6 | + off-the-shelf cross-encoder reranker (bge-reranker-v2-m3) | 0.805 | — | — | +3.3 s |
-| 7a | Text model fine-tuned on our data (e5-base, labels + hard negatives) | 0.804 | 0.779 | 0.982 | 90 ms + ~80 ms to embed |
-| 7b | + small reranker fine-tuned on our pairs (MiniLM 118M) | 0.811 | — | — | +0.3 s |
-| 7c | Image model fine-tuned on our data (Marqo, cross-fitted) | 0.819 | 0.797 | 0.971 | 90 ms + ~340 ms to embed |
-| 7d | 7c + fine-tuned reranker | 0.819 | — | — | +0.3 s — **no gain, dropped** |
-| **8** | **7c + relative cutoff = FINAL** | **0.821** | **0.798** | 0.971 | as 7c |
+All choices were made on validation; the test split was unlocked **once**, at the end. Every gain
+was checked with a paired bootstrap test.
 
-Rerankers (6, 7b, 7d) and the comparison rungs were not run on test: their pair scores exist only for
-validation candidates, and none is in the final pipeline. Full write-up per rung, with failure
-examples and bootstrap tests: [docs/ladder.md](docs/ladder.md).
+## Key findings
 
-**What the ladder shows**
-- Cheap signals first: BM25 + photo hashes reach 0.73 test F1 with no neural network.
-- Off-the-shelf models are *complementary*, not better: alone they score below BM25, fused they add +0.05.
-- Fine-tuning our own models on our own mistakes (hard negatives) beat every larger off-the-shelf model
-  and made the slow reranker unnecessary.
-- The ordering of every rung holds on the untouched test split; test sits ~0.02 below validation (a
-  larger pool and the usual optimism of tuning on validation).
+- **Cheap signals go a long way.** Keyword search plus photo hashes reach 0.73 test F1 with no
+  neural network.
+- **Off-the-shelf AI models are complementary, not better.** Alone, the best text model (bge-m3)
+  scored *below* BM25. Combined, they found 18% more correct matches than either one.
+- **Domain beats generality.** A model trained on shop product photos (Marqo e-commerce) beat five
+  general-purpose image models of similar size (CLIP, SigLIP, SigLIP 2, DINOv2, Swin V2).
+- **Fine-tuning on our own mistakes won.** Training on "hard negatives" (look-alikes the system
+  confused) took a small text model past a model twice its size, in 15 minutes on a free GPU. Labels
+  were worth about 5× more than self-supervised training (SimCSE).
+- **It made the expensive part unnecessary.** An off-the-shelf cross-encoder reranker added +0.011
+  at 3.3 s per listing on CPU. Once the image model was fine-tuned, even a reranker fine-tuned on our
+  own pairs added nothing, so the final pipeline has none.
+- **Honest evaluation.** The fine-tuned models were cross-fitted (trained on one half of the products,
+  judged on the other) and re-checked without training listings in the pool, to rule out memorisation.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    Q[Listing<br/>title + photo] --> R1[BM25<br/>+ canonical units]
-    Q --> R3[Text embedding<br/>e5-base fine-tuned · FAISS]
-    Q --> R4[Image embedding<br/>Marqo fine-tuned · FAISS / Qdrant]
-    R1 & R3 & R4 --> F[Learned fusion<br/>logistic regression]
-    Q --> R2[pHash near-duplicates]
-    F & R2 --> D[Decision<br/>threshold + at-least-one + relative cutoff] --> M[Matches]
+    Q[Listing<br/>title + photo] --> B[BM25<br/>keyword search]
+    Q --> T[Text embedding<br/>fine-tuned e5-base]
+    Q --> I[Image embedding<br/>fine-tuned Marqo]
+    B & T & I --> F[Learned fusion<br/>logistic regression]
+    Q --> P[Photo hash<br/>near-duplicates]
+    F & P --> D[Decision rules<br/>cutoff · at least one match · near-ties] --> M[Matches]
 ```
 
-Fast retrievers find candidates (98% of true matches in the top 50); a small learned judge combines
-their scores; decision rules turn scores into matches. Mistakes on the training split became hard
-negatives for fine-tuning both encoders. Details: [docs/architecture.md](docs/architecture.md).
+1. **Retrieve.** Three retrievers each propose candidates; together they find 98% of true matches
+   in the top 50. Embeddings are searched with FAISS.
+2. **Combine.** A small logistic regression, trained on the training split, turns the three scores
+   into one probability.
+3. **Decide.** A cutoff tuned on validation, plus two rules: every listing keeps its best match
+   (every product has at least two listings), and near-ties of a confident match are accepted too.
 
-## Quickstart
+## Tech
 
-Requires Python 3.12.
+Python · NumPy · pandas · SciPy · PyTorch · sentence-transformers · open_clip · FAISS · Qdrant · BM25 ·
+Kaggle GPUs for model work · pytest
+
+## Run it
 
 ```bash
-git clone https://github.com/stkef/matchlens.git
-cd matchlens
-python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt      # macOS/Linux: .venv/bin/python
+pip install -r requirements.txt
+python -m pytest -q                                              # 19 tests
+python -m matchlens.data --csv path/to/train.csv                 # group split + manifest
+python -m matchlens.evaluate configs/rung01_bm25.toml --split val
 ```
 
-Try the whole pipeline on synthetic data (no download needed; the numbers mean nothing):
+Each config is one step of the ladder; [`configs/rung08_final.toml`](configs/rung08_final.toml) is the
+final pipeline. Model training and embedding run as Kaggle notebooks in [`kaggle/`](kaggle). See
+[docs/kaggle.md](docs/kaggle.md). Every run appends to [`results/ledger.csv`](results/ledger.csv).
 
-```bash
-python -m matchlens.synthetic
-python -m matchlens.data --csv data/synthetic/train.csv --out data/synthetic/split.csv
-python -m matchlens.evaluate configs/smoke_bm25.toml --split val --results-dir data/synthetic/results
-python -m pytest -q
-```
+## Limits
 
-## Reproduce
+- Missed the planned target of +0.15 F1 over BM25: reached +0.142 on validation, +0.121 on test.
+- Embedding a brand-new listing takes ~340 ms on CPU (photo model ~260 ms), over the 300 ms
+  target without a GPU.
+- Some remaining "errors" are label noise in the dataset (identical listings labelled as different
+  products).
 
-1. Accept the competition rules for "Shopee - Price Match Guarantee" on Kaggle and set up a Kaggle API
-   token, then download:
+## More detail
 
-   ```bash
-   kaggle competitions download -c shopee-product-matching -p data/raw
-   unzip data/raw/shopee-product-matching.zip -d data/raw
-   ```
-
-   Only `train.csv` has labels, so all splits are cut from it. Rung 1 needs only that file
-   (`-f train.csv`, ~2.5 MB). The images are ~1.7 GB; keep them out of synced folders (OneDrive,
-   Dropbox) and point `[data] csv` in the config at wherever they live.
-
-2. Create the split (once; the manifest records the source file's SHA-256 and refuses to silently change):
-
-   ```bash
-   python -m matchlens.data
-   ```
-
-3. Run a rung:
-
-   ```bash
-   python -m matchlens.evaluate configs/rung01_bm25.toml --split val
-   ```
-
-   This writes `results/runs/rung01_bm25__val.json` (all metrics plus the threshold curve) and appends
-   a row to `results/ledger.csv`.
-
-## Documentation
-
-| Doc | What's in it |
+| Doc | Contents |
 |---|---|
-| [docs/PRD.md](docs/PRD.md) | Goals, scope, requirements, milestones, risks |
-| [docs/architecture.md](docs/architecture.md) | Components, data flow, the retriever contract, how to add a rung |
-| [docs/evaluation.md](docs/evaluation.md) | Splits, protocol and exact metric definitions |
-| [docs/ladder.md](docs/ladder.md) | One entry per rung: hypothesis, change, result, verdict |
+| [docs/ladder.md](docs/ladder.md) | Every step: hypothesis, result, bootstrap test, failure examples |
+| [docs/evaluation.md](docs/evaluation.md) | Splits, protocol, metric definitions |
+| [docs/architecture.md](docs/architecture.md) | Components, vector stores, config format |
+| [docs/PRD.md](docs/PRD.md) | Original plan, goals and risks |
 
-## Project layout
+## Licence
 
-```
-matchlens/
-  data.py          listing loader, group-level split + manifest
-  text.py          title decoding and tokenisation
-  retrievers/      bm25, phash, dense (precomputed embeddings), fusion, rerank
-  stores.py        vector stores: FAISS (text), Qdrant (images), numpy (exact reference)
-  metrics.py       recall@k, MRR, competition F1 (+ at-least-one, relative cutoff), precision@recall
-  threshold.py     threshold tuning on validation
-  evaluate.py      the harness: one config in, one ledger row out
-  fusion_train.py  learned fusion weights (train split, optional fold)
-  mine_negatives.py, rerank_pairs.py, rerank_judge.py, fasttext_embed.py
-  synthetic.py     fake Shopee-format data for tests
-kaggle/            GPU notebooks: embeddings, reranking, fine-tuning (see docs/kaggle.md)
-configs/           one TOML per rung; rung08_final.toml is the frozen pipeline
-results/           ledger.csv + per-run JSON (committed)
-tests/
-docs/
-```
-
-## Status
-
-**Ladder complete and frozen (2026-10-08).** Final pipeline `configs/rung08_final.toml`: test F1 0.798.
-Possible next steps: a demo app and API, the 100-error label audit, and fine-tuning the text model with
-cross-fitting as the image model was.
-
-## Licence and data
-
-Code: [MIT](LICENSE).
-
-The Shopee dataset is © its owners and distributed by Kaggle under the competition's rules. It is
-**not** included in this repository; download it yourself under those terms.
+Code: [MIT](LICENSE). The Shopee data is not included; download it from Kaggle under the competition
+rules.
