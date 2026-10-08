@@ -332,8 +332,66 @@ validation improves.
   from 7c on. Re-running 7a with it gives F1 0.80381 instead of 0.80396 (near-tie reordering); every 7c
   comparison above was run with the same FAISS version.
 
-## Rung 8 — Per-cluster / adaptive thresholds
+- **Rung 7d — fine-tuned reranker on top of 7c (done, dropped):**
+  - Same recipe as 7b on 7c's top-20 candidates (`rerank_pairs --folds-file data/splits/train_folds_v1.csv`;
+    private dataset `matchlens-rerank-pairs-7d`; reranker trained on fold A, judge on fold B).
+  - **Result (val):** F1 0.8185 vs 0.8189 for 7c. Bootstrap: mean −0.0004, 95% [−0.0044, +0.0035],
+    positive in 42.5% — no effect.
+  - **Why:** once the image model was fine-tuned, the look-alike cases the reranker used to fix are
+    already ranked correctly; the reranker had nothing left to add. **Verdict:** dropped — the final
+    pipeline has no reranker, which also saves ~0.3 s of CPU per listing.
 
-- **Kind:** additive
-- **Hypothesis:** One threshold is too strict for some product types and too loose for others.
-- **Result / verdict:** _pending_
+## Rung 8 — Adaptive (relative) cutoff
+
+- **Kind:** additive (decision rule only; no new model)
+- **Hypothesis:** products with several listings produce a cluster of near-equal scores; one global
+  cutoff keeps the first and drops some of the rest.
+- **Change:** when a query's best candidate clears the threshold, also accept candidates scoring at least
+  `relative` × the best score (`[eval] relative`, `metrics.f1_curve`). Low-confidence queries are
+  unaffected. (Planned per-cluster thresholds were replaced by this simpler rule; Shopee has no
+  categories to cluster by reliably.)
+- **Sweep on val (7c pipeline):** off 0.8189 · 0.97 0.8188 · 0.95 0.8188 · 0.90 0.8193 · 0.85 0.8199 ·
+  **0.80 0.8207** · 0.75 0.8204 · 0.70 0.8183 · 0.60 0.8101 · 0.50 0.7981.
+- **Result (val):** F1 **0.8207** (+0.0018 over 7c). Bootstrap: 95% [+0.0002, +0.0034], positive in 98.6%
+  — real but tiny, and measured on the same val data used to pick 0.80, so optimistic.
+- **Verdict:** kept as the final decision rule; on test it adds +0.0004, i.e. essentially nothing.
+
+---
+
+## Final: test split (unlocked once, 2026-10-08)
+
+The ladder was frozen with `configs/rung08_final.toml` (7c + relative cutoff 0.80). The test split
+(6,819 listings, pool 30,884 with train distractors) was then evaluated **once** for the rungs that make
+up the final pipeline's path, each reusing its validation threshold unchanged:
+
+| Rung | Val F1 | Test F1 | Test recall@50 | Test MRR |
+|---|---|---|---|---|
+| 0 floor (self only) | 0.469 | 0.463 | — | — |
+| 1 BM25 | 0.679 | 0.677 | 0.911 | 0.792 |
+| 1b + canonical units | 0.682 | 0.677 | 0.911 | 0.793 |
+| 2 + pHash near-duplicates | 0.744 | 0.726 | 0.930 | 0.840 |
+| 5d fusion (off-the-shelf models) | 0.793 | 0.776 | 0.976 | 0.870 |
+| 7a + fine-tuned text model | 0.804 | 0.779 | 0.982 | 0.875 |
+| 7c + fine-tuned image model | 0.819 | 0.797 | 0.971 | 0.884 |
+| **8 final (+ relative cutoff)** | **0.821** | **0.798** | 0.971 | 0.884 |
+
+- **Every rung's ordering holds on test.** The big steps — pHash (+0.049), fusion (+0.050), fine-tuned
+  image model (+0.018) — transfer; the small ones (1b, rung 8) shrink to ~0, as their size suggested.
+- **Test is ~0.02 below val** from rung 2 on: a larger pool (30,884 vs 27,431 → more look-alikes) plus
+  the usual optimism of making every choice on validation. Rung 1, which has almost nothing tuned,
+  matches val to 0.002.
+- **Final: test F1 0.798, +0.335 over the floor and +0.121 over BM25** The PRD target of +0.15 F1 over BM25 was
+  narrowly **missed**: +0.142 on val, +0.121 on test.
+- **PRD targets, honestly scored:**
+
+  | Target | Result | Met? |
+  |---|---|---|
+  | Final F1 ≥ +0.15 over BM25 | +0.142 val, +0.121 test | ✗ narrowly |
+  | Fine-tuning ≥ +0.03 F1 over best off-the-shelf | text model alone +0.030 (vs bge-m3); full pipeline +0.026 val / +0.021 test (7c vs 5d) | ≈ / ✗ |
+  | Candidate recall@50 ≥ 0.95 | 0.98 val, 0.97 test | ✓ |
+  | p95 ≤ 300 ms on CPU | search 46 ms p95, but embedding a *new* listing on CPU adds ~80 ms (text) + ~260 ms (photo) | ✗ without a GPU |
+  | Fine-tuning < 2 h on a free GPU | 15 min (text), 8 min (reranker), 13 min (image) | ✓ |
+  | Every number reproducible | configs + seeds + pinned versions; FAISS version change moved one F1 by 0.00015 | ✓ |
+
+- Not run on test: comparison rungs (3, 4) and reranker rungs (6, 7b, 7d), whose cross-encoder scores
+  exist only for validation candidates; none is in the final pipeline.

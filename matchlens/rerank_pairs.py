@@ -47,6 +47,7 @@ def main(argv=None) -> None:
     p.add_argument("--train-queries", type=int, default=6000, help="0 = all train listings")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out-dir", default="C:/data/shopee/rerank")
+    p.add_argument("--folds-file", help="use these train folds (e.g. data/splits/train_folds_v1.csv) instead of drawing new ones")
     args = p.parse_args(argv)
     cfg = load_config(args.config)
     csv, split = cfg["data"]["csv"], cfg["data"]["split"]
@@ -71,10 +72,13 @@ def main(argv=None) -> None:
               f"{pairs['same'].sum()} true ({pairs['same'].sum() / true_others:.1%} of all true pairs within top {args.n})")
         cols = ["query", "candidate"]
         if name == "train":
-            # Folds by product, not by listing, so no product has listings in both folds.
-            groups = queries["label_group"].unique()
-            in_a = set(groups[np.random.default_rng(args.seed).random(len(groups)) < 0.5])
-            folds = pd.Series(np.where(queries["label_group"].isin(in_a), "A", "B"), index=queries["posting_id"])
+            if args.folds_file:
+                folds = pd.read_csv(args.folds_file).set_index("posting_id")["fold"]
+            else:
+                # Folds by product, not by listing, so no product has listings in both folds.
+                groups = queries["label_group"].unique()
+                in_a = set(groups[np.random.default_rng(args.seed).random(len(groups)) < 0.5])
+                folds = pd.Series(np.where(queries["label_group"].isin(in_a), "A", "B"), index=queries["posting_id"])
             pairs["fold"] = folds[pairs["query"]].to_numpy()
             cols.append("fold")
         pairs.to_csv(out / f"pairs_{name}.csv", index=False)

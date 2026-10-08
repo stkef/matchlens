@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-10-08T05:17:12+00:00",
+  "name": "rung07a_fusion",
+  "rung": "7a",
+  "split": "test",
+  "git_sha": "022e5ae",
+  "config": {
+    "name": "rung07a_fusion",
+    "rung": "7a",
+    "description": "Rung 5d with the text member swapped for the fine-tuned e5-base (labels + hard negatives)",
+    "data": {
+      "csv": "C:/data/shopee/train.csv",
+      "split": "data/splits/split_v1.csv"
+    },
+    "retriever": {
+      "type": "phash_boost",
+      "max_dist": 6,
+      "base": {
+        "type": "fusion",
+        "method": "learned",
+        "model_path": "results/fusion/rung07a_logreg.json",
+        "members": [
+          {
+            "type": "bm25",
+            "k1": 1.2,
+            "b": 0.75,
+            "canonical_units": true
+          },
+          {
+            "type": "dense",
+            "path": "C:/data/shopee/embeddings/emb_e5ft_supervised.npz",
+            "expand_k": 3,
+            "expand_alpha": 3.0,
+            "store": {
+              "type": "faiss",
+              "index": "flat",
+              "path": "C:/data/shopee/stores/faiss_text_e5ft_supervised_expanded.index"
+            }
+          },
+          {
+            "type": "dense",
+            "path": "C:/data/shopee/embeddings/emb_img_marqo_ecom_b.npz",
+            "expand_k": 3,
+            "expand_alpha": 3.0,
+            "store": {
+              "type": "faiss",
+              "index": "flat",
+              "path": "C:/data/shopee/stores/faiss_img_marqo_ecom_b_expanded.index"
+            }
+          }
+        ]
+      }
+    },
+    "eval": {
+      "k": 50,
+      "distractors": [
+        "train"
+      ],
+      "latency_sample": 200,
+      "min_matches": 1
+    },
+    "cost": {
+      "usd_per_hour": 0.1
+    }
+  },
+  "metrics": {
+    "n_queries": 6819,
+    "pool_size": 30884,
+    "recall@10": 0.9198845080389295,
+    "recall@50": 0.9823121456592945,
+    "mrr": 0.8748437833038185,
+    "f1": 0.779449990606239,
+    "threshold": 0.56,
+    "precision@recall0.9": 0.3293985642481767,
+    "p50_ms": 28.043300000717863,
+    "p95_ms": 44.67860499898961,
+    "usd_per_1k_queries": 0.0008706593749937181,
+    "fit_s": 19.78483459999552
+  },
+  "threshold_curve": null
+}

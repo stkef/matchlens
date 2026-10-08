@@ -246,3 +246,15 @@ def test_rrf_fusion_rewards_agreement():
     res = r.search(corpus.iloc[[0]], 3)
     assert res.indices[0, 0] == 0 and res.scores[0, 0] == pytest.approx(1.0)  # first for both members
     assert (np.diff(res.scores[0][res.indices[0] >= 0]) <= 0).all()
+
+
+def test_relative_rule_accepts_near_ties_of_a_confident_best(toy):
+    cands, labels = toy
+    plain = metrics.f1_per_listing(cands, labels, 0.85)
+    rel = metrics.f1_per_listing(cands, labels, 0.85, relative=0.4)
+    # Row 0: best .9 clears .85, so .8 and .4 (>= .36) join: tp=3, |P|=4, |T|=3 -> 6/7 (was 2/5).
+    assert plain[0] == pytest.approx(2 / 5) and rel[0] == pytest.approx(6 / 7)
+    # Row 1: .9 and .7 -> both true: tp=3, |P|=3, |T|=3 -> 1.0.
+    assert rel[1] == pytest.approx(1.0)
+    # Row 4: best is only .4 (< .85), so nothing extra is accepted.
+    assert rel[4] == pytest.approx(plain[4])

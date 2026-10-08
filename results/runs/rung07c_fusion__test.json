@@ -1,0 +1,81 @@
+{
+  "timestamp": "2026-10-08T05:17:54+00:00",
+  "name": "rung07c_fusion",
+  "rung": "7c",
+  "split": "test",
+  "git_sha": "022e5ae",
+  "config": {
+    "name": "rung07c_fusion",
+    "rung": "7c",
+    "description": "Rung 7a with the image member swapped for Marqo fine-tuned on fold A; judge on fold B",
+    "data": {
+      "csv": "C:/data/shopee/train.csv",
+      "split": "data/splits/split_v1.csv"
+    },
+    "retriever": {
+      "type": "phash_boost",
+      "max_dist": 6,
+      "base": {
+        "type": "fusion",
+        "method": "learned",
+        "model_path": "results/fusion/rung07c_foldB_logreg.json",
+        "members": [
+          {
+            "type": "bm25",
+            "k1": 1.2,
+            "b": 0.75,
+            "canonical_units": true
+          },
+          {
+            "type": "dense",
+            "path": "C:/data/shopee/embeddings/emb_e5ft_supervised.npz",
+            "expand_k": 3,
+            "expand_alpha": 3.0,
+            "store": {
+              "type": "faiss",
+              "index": "flat",
+              "path": "C:/data/shopee/stores/faiss_text_e5ft_supervised_expanded.index"
+            }
+          },
+          {
+            "type": "dense",
+            "path": "C:/data/shopee/embeddings/emb_img_marqo_ft.npz",
+            "expand_k": 3,
+            "expand_alpha": 3.0,
+            "store": {
+              "type": "faiss",
+              "index": "flat",
+              "path": "C:/data/shopee/stores/faiss_img_marqo_ft_expanded.index"
+            }
+          }
+        ]
+      }
+    },
+    "eval": {
+      "k": 50,
+      "distractors": [
+        "train"
+      ],
+      "latency_sample": 200,
+      "min_matches": 1
+    },
+    "cost": {
+      "usd_per_hour": 0.1
+    }
+  },
+  "metrics": {
+    "n_queries": 6819,
+    "pool_size": 30884,
+    "recall@10": 0.9228114372307069,
+    "recall@50": 0.971382390633008,
+    "mrr": 0.8844643391985803,
+    "f1": 0.7970675208085131,
+    "threshold": 0.71,
+    "precision@recall0.9": 0.38799509123029413,
+    "p50_ms": 29.363549998379312,
+    "p95_ms": 43.57916499830026,
+    "usd_per_1k_queries": 0.0008717950833346953,
+    "fit_s": 20.52705900000001
+  },
+  "threshold_curve": null
+}

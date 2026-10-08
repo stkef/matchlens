@@ -12,43 +12,56 @@ one technique at a time, measure what each one gained or cost, and explain where
 
 ## Results
 
-Validation split of Shopee – Price Match Guarantee: 3,366 query listings searched against a pool of
-27,431 (validation + all training listings as distractors). The test split stays locked until the
-ladder is frozen. For scale: predicting "each listing matches only itself" already scores **F1 0.469**.
+**Final pipeline: F1 0.798 on the held-out test split** (0.821 on validation), from 0.463 for "each
+listing matches only itself". The ladder was frozen on validation, then the test split was unlocked
+once; every test number below reuses its validation threshold unchanged.
 
-| # | Rung | Recall@50 | F1 | p95 latency |
-|---|---|---|---|---|
-| 0 | No model (each listing matches only itself) | — | 0.469 | — |
-| 1 | BM25 on titles + global threshold | 0.917 | 0.679 | 1.0 ms |
-| 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.918 | 0.682 | 1.8 ms |
-| 2 | + near-duplicate photos (image phash within 6 bits) | 0.941 | **0.744** | 2.0 ms |
-| 3 | *Comparison:* text embeddings alone, best = bge-m3 (also: e5, mpnet, FastText trained here) | 0.900 | 0.673 | 5 ms + 274 ms to embed the query on CPU |
-| 4 | *Comparison:* image embeddings alone, best = Marqo e-commerce CLIP (also: SigLIP 2, DINOv2, SigLIP, CLIP, Swin V2) | 0.941 | 0.708 | 257 ms to embed the photo on CPU |
-| 5 | Fusion of BM25 + bge-m3 + Marqo (RRF → learned weights) + at-least-one-match + neighbour voting | 0.978 | **0.793** | 90 ms search + ~530 ms to embed a new query on CPU |
-| 6 | + Cross-encoder reranker (bge-reranker-v2-m3) on the top 20 | — | **0.805** | 3.3 s per listing on CPU (GPU needed) |
-| 7a | Fine-tuned text model (e5-base + labels + hard negatives) swapped into rung 5 | 0.986 | 0.804 | 90 ms search + ~80 ms to embed a title on CPU (no reranker) |
-| 7b | + our fine-tuned small reranker (MiniLM, 118M) on the top 20 | — | 0.811 | + ~0.3 s per listing on CPU for 20 pairs |
-| 7c | Fine-tuned image model (Marqo, fold A) in the rung 7a pipeline, judge on fold B (no reranker) | 0.980 | **0.819** | 90 ms search + ~80 ms text + ~260 ms photo embedding on CPU |
-| 8 | Per-cluster / adaptive thresholds | — | — | — |
+Shopee – Price Match Guarantee, split by product. Validation: 3,366 query listings in a pool of 27,431
+(validation + all training listings as distractors). Test: 6,819 queries in a pool of 30,884.
 
-"—" means not run yet. Every row regenerates from one command (see [Reproduce](#reproduce)).
+| # | Rung | Val F1 | **Test F1** | Test R@50 | Query cost on CPU |
+|---|---|---|---|---|---|
+| 0 | No model (each listing matches only itself) | 0.469 | 0.463 | — | — |
+| 1 | BM25 on titles + global threshold | 0.679 | 0.677 | 0.911 | 1 ms |
+| 1b | + canonical units (400 gram = 400gr = 0.4 kg) | 0.682 | 0.677 | 0.911 | 2 ms |
+| 2 | + near-duplicate photos (pHash ≤ 6 bits) | 0.744 | 0.726 | 0.930 | 2 ms |
+| 3 | *Comparison:* text embeddings alone — bge-m3 best of 5 (e5, mpnet, FastText trained here) | 0.673 | — | — | +274 ms to embed |
+| 4 | *Comparison:* image embeddings alone — Marqo e-commerce best of 6 (SigLIP 2, DINOv2, SigLIP, CLIP, Swin V2) | 0.708 | — | — | +257 ms to embed |
+| 5 | Fusion BM25 + bge-m3 + Marqo: learned weights, at-least-one-match, neighbour voting | 0.793 | 0.776 | 0.976 | 90 ms + ~530 ms to embed |
+| 6 | + off-the-shelf cross-encoder reranker (bge-reranker-v2-m3) | 0.805 | — | — | +3.3 s |
+| 7a | Text model fine-tuned on our data (e5-base, labels + hard negatives) | 0.804 | 0.779 | 0.982 | 90 ms + ~80 ms to embed |
+| 7b | + small reranker fine-tuned on our pairs (MiniLM 118M) | 0.811 | — | — | +0.3 s |
+| 7c | Image model fine-tuned on our data (Marqo, cross-fitted) | 0.819 | 0.797 | 0.971 | 90 ms + ~340 ms to embed |
+| 7d | 7c + fine-tuned reranker | 0.819 | — | — | +0.3 s — **no gain, dropped** |
+| **8** | **7c + relative cutoff = FINAL** | **0.821** | **0.798** | 0.971 | as 7c |
+
+Rerankers (6, 7b, 7d) and the comparison rungs were not run on test: their pair scores exist only for
+validation candidates, and none is in the final pipeline. Full write-up per rung, with failure
+examples and bootstrap tests: [docs/ladder.md](docs/ladder.md).
+
+**What the ladder shows**
+- Cheap signals first: BM25 + photo hashes reach 0.73 test F1 with no neural network.
+- Off-the-shelf models are *complementary*, not better: alone they score below BM25, fused they add +0.05.
+- Fine-tuning our own models on our own mistakes (hard negatives) beat every larger off-the-shelf model
+  and made the slow reranker unnecessary.
+- The ordering of every rung holds on the untouched test split; test sits ~0.02 below validation (a
+  larger pool and the usual optimism of tuning on validation).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    Q[Listing<br/>title + photo] --> R1[BM25]
-    Q --> R2[Near-dup filter]
-    Q --> R3[Text embeddings]
-    Q --> R4[Image embeddings]
-    R1 & R2 & R3 & R4 --> F[Fusion]
-    F -->|top N| RR[Reranker]
-    RR --> D[Threshold] --> M[Matches]
+    Q[Listing<br/>title + photo] --> R1[BM25<br/>+ canonical units]
+    Q --> R3[Text embedding<br/>e5-base fine-tuned · FAISS]
+    Q --> R4[Image embedding<br/>Marqo fine-tuned · FAISS / Qdrant]
+    R1 & R3 & R4 --> F[Learned fusion<br/>logistic regression]
+    Q --> R2[pHash near-duplicates]
+    F & R2 --> D[Decision<br/>threshold + at-least-one + relative cutoff] --> M[Matches]
 ```
 
-Cheap retrievers aim for high recall; the expensive reranker only sees the top N, which keeps latency
-down. Mistakes on the training split become hard negatives for fine-tuning the encoders.
-Details: [docs/architecture.md](docs/architecture.md).
+Fast retrievers find candidates (98% of true matches in the top 50); a small learned judge combines
+their scores; decision rules turn scores into matches. Mistakes on the training split became hard
+negatives for fine-tuning both encoders. Details: [docs/architecture.md](docs/architecture.md).
 
 ## Quickstart
 
@@ -114,13 +127,16 @@ python -m pytest -q
 matchlens/
   data.py          listing loader, group-level split + manifest
   text.py          title decoding and tokenisation
-  retrievers/      Retriever interface + implementations (bm25.py)
+  retrievers/      bm25, phash, dense (precomputed embeddings), fusion, rerank
   stores.py        vector stores: FAISS (text), Qdrant (images), numpy (exact reference)
-  metrics.py       recall@k, MRR, competition F1, precision@recall
-  threshold.py     global threshold tuning on validation
+  metrics.py       recall@k, MRR, competition F1 (+ at-least-one, relative cutoff), precision@recall
+  threshold.py     threshold tuning on validation
   evaluate.py      the harness: one config in, one ledger row out
+  fusion_train.py  learned fusion weights (train split, optional fold)
+  mine_negatives.py, rerank_pairs.py, rerank_judge.py, fasttext_embed.py
   synthetic.py     fake Shopee-format data for tests
-configs/           one TOML per rung
+kaggle/            GPU notebooks: embeddings, reranking, fine-tuning (see docs/kaggle.md)
+configs/           one TOML per rung; rung08_final.toml is the frozen pipeline
 results/           ledger.csv + per-run JSON (committed)
 tests/
 docs/
@@ -128,8 +144,9 @@ docs/
 
 ## Status
 
-Rungs 1–3 are done. Best so far: F1 0.744 (rung 2). Rung 3 showed text embeddings alone score below BM25, but find different matches: together they get 18% more correct matches than either alone. Its failure analysis is in
-[docs/ladder.md](docs/ladder.md). Rungs 1–7c are done: **F1 0.819** on validation (from 0.469 with no model), using our own fine-tuned text and image models. Next: stack the fine-tuned reranker on 7c, rung 8 (thresholds), then the one-time test run.
+**Ladder complete and frozen (2026-10-08).** Final pipeline `configs/rung08_final.toml`: test F1 0.798.
+Possible next steps: a demo app and API, the 100-error label audit, and fine-tuning the text model with
+cross-fitting as the image model was.
 
 ## Licence and data
 

@@ -21,8 +21,8 @@ class ThresholdResult:
 
 
 def tune_threshold(cands: Candidates, labels: np.ndarray, grid: np.ndarray = DEFAULT_GRID,
-                   min_matches: int = 0) -> ThresholdResult:
+                   min_matches: int = 0, relative: float = 0.0) -> ThresholdResult:
     """Pick the threshold maximising mean per-listing F1. Ties go to the higher (stricter) threshold."""
-    mean_f1 = f1_curve(cands, labels, grid, min_matches).mean(axis=1)
+    mean_f1 = f1_curve(cands, labels, grid, min_matches, relative).mean(axis=1)
     best = len(grid) - 1 - int(np.argmax(mean_f1[::-1]))
     return ThresholdResult(float(grid[best]), float(mean_f1[best]), grid, mean_f1)
